@@ -176,7 +176,10 @@ export default function GuideScreen() {
               Setup → Owed. Add a loan or tax bill with the envelope it’s paid from, the amount owed, and an optional due
               date.
             </li>
-            <li>Pay records a spend from the envelope and lowers what’s owed.</li>
+            <li>
+              Pay records a spend from the envelope and lowers what’s owed. For a loan, enter the interest part ($ from
+              your statement, or % a year to have it worked out); only the rest lowers what’s owed.
+            </li>
             <li>Update owed is for interest or a new statement; it moves no money.</li>
             <li>Tip: give a tax bill’s envelope a Save up by a date target with the same amount and date.</li>
           </ul>

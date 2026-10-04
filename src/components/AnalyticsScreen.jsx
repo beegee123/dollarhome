@@ -126,6 +126,11 @@ export default function AnalyticsScreen() {
     .filter((d) => d.kind === 'tax' && d.due_date)
     .sort((a, b) => a.due_date.localeCompare(b.due_date))[0]
   const owedTotal = owedHere.reduce((s, d) => s + d.amount_owed, 0)
+  // Interest paid on loans this calendar year (in this currency).
+  const year = month.slice(0, 4)
+  const interestYear = data.interest
+    .filter((t) => t.currency === currency && t.date.startsWith(year))
+    .reduce((s, t) => s + t.amount, 0)
 
   const activeBanks = data.banks.filter((b) => !b.archived)
 
@@ -260,7 +265,7 @@ export default function AnalyticsScreen() {
               <h2>Owed ({currency})</h2>
               {owedTotal > 0 && <span className="money strong">{money(owedTotal)}</span>}
             </div>
-            {owedHere.length === 0 && (
+            {owedHere.length === 0 && interestYear === 0 && (
               <p className="card-sub">
                 Nothing owed in {currency}. <Link to="/owed">Open Owed</Link>
               </p>
@@ -282,6 +287,11 @@ export default function AnalyticsScreen() {
                 </div>
               )
             })}
+            {interestYear > 0 && (
+              <p className="card-sub card-sub--flat">
+                Interest paid in {year}: <span className="money">{money(interestYear)}</span>
+              </p>
+            )}
             {nextTax && (
               <p className="card-sub card-sub--flat">
                 Next bill: <strong>{nextTax.name}</strong> · <span className="money">{money(nextTax.amount_owed)}</span> due{' '}

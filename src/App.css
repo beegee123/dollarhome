@@ -971,3 +971,20 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 /* Update balance: "Save and adjust to match" */
 .adjust-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: #f4f4f1; }
 .adjust-button { margin-top: 0; }
+
+/* ---- Loan interest on the Pay panel ---- */
+.interest-box { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 10px; background: #f4f4f1; }
+.interest-head { display: flex; justify-content: space-between; align-items: center; }
+.field-label { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mini-toggle { display: flex; border: 1px solid #bdbdb5; border-radius: 8px; overflow: hidden; }
+.mini-toggle button {
+  min-width: 44px;
+  min-height: 36px;
+  border: 0;
+  background: var(--card);
+  font: 600 14px var(--sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+.mini-toggle button + button { border-left: 1px solid #bdbdb5; }
+.mini-toggle button.on { background: var(--accent); color: #fff; }

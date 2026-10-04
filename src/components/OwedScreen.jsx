@@ -94,11 +94,11 @@ export default function OwedScreen() {
     .map(([c, n]) => formatMoney(n, c))
     .join(' + ')
 
-  async function savePayment(debt, { amount, paidOn, note }) {
-    const txId = await payDebt({ debtId: debt.id, amount, paidOn, note })
+  async function savePayment(debt, { amount, paidOn, note, interest }) {
+    const txId = await payDebt({ debtId: debt.id, amount, paidOn, note, interest })
     setPaying(null)
     reload()
-    if (amount >= debt.amount_owed) {
+    if (amount - interest >= debt.amount_owed) {
       setCelebrating(debt)
     } else {
       showToast(`Paid ${formatMoney(amount, debt.currency)} toward ${debt.name}`, async () => {
@@ -155,6 +155,7 @@ export default function OwedScreen() {
                   category_id: f.categoryId,
                   original_amount: f.originalAmount,
                   due_date: f.dueDate || null,
+                  annual_rate: f.annualRate,
                 }),
               )) && setEditingId(null)
             }
@@ -299,6 +300,15 @@ function DebtCard({ debt, envelope, busy, onPay, onUpdate, onEdit }) {
 
       {due && <span className={`debt-sub ${due.tone}`}>{due.text}</span>}
 
+      {(debt.annual_rate !== null || debt.interest.total > 0) && (
+        <span className="muted debt-sub">
+          {debt.annual_rate !== null && `${debt.annual_rate}% a year`}
+          {debt.annual_rate !== null && debt.interest.total > 0 && ' · '}
+          {debt.interest.total > 0 &&
+            `Interest paid ${formatMoney(debt.interest.thisYear, c)} this year (${formatMoney(debt.interest.total, c)} in all)`}
+        </span>
+      )}
+
       <span className="muted debt-sub">
         {envelope ? (
           <>
@@ -330,6 +340,7 @@ function DebtForm({ banks, initial, busy, onSave, onCancel, onDelete }) {
   const [owedText, setOwedText] = useState(initial ? String(initial.amount_owed) : '')
   const [originalText, setOriginalText] = useState(initial ? String(initial.original_amount) : '')
   const [dueDate, setDueDate] = useState(initial?.due_date ?? '')
+  const [rateText, setRateText] = useState(initial?.annual_rate != null ? String(initial.annual_rate) : '')
   const [error, setError] = useState(null)
 
   // The envelope decides the currency.
@@ -348,8 +359,11 @@ function DebtForm({ banks, initial, busy, onSave, onCancel, onDelete }) {
         if (owed === null || owed < 0) return setError('Enter how much is owed now, like 8400')
         if (original === null || original < 0) return setError('Enter the starting amount, or leave it blank')
         if (!categoryId) return setError('Pick the envelope it’s paid from.')
+        const rate = rateText.trim() === '' ? null : parseBalance(rateText.replace('%', ''))
+        if (rate !== null && (rate === null || rate < 0 || rate > 100)) return setError('Enter the interest rate as a percent, like 6.5')
+        if (rateText.trim() !== '' && rate === null) return setError('Enter the interest rate as a percent, like 6.5')
         setError(null)
-        await onSave({ name, kind, currency, categoryId, amountOwed: owed, originalAmount: Math.max(original, owed), dueDate })
+        await onSave({ name, kind, currency, categoryId, amountOwed: owed, originalAmount: Math.max(original, owed), dueDate, annualRate: rate })
       }}
     >
       <h2 className="section-title">{initial ? 'Edit' : 'Add to Owed'}</h2>
@@ -405,6 +419,12 @@ function DebtForm({ banks, initial, busy, onSave, onCancel, onDelete }) {
           <input inputMode="decimal" placeholder="same as owed" value={originalText} onChange={(e) => setOriginalText(e.target.value)} />
         </label>
       </div>
+      {kind === 'loan' && (
+        <label className="field">
+          <span>Interest rate (% a year, optional)</span>
+          <input inputMode="decimal" placeholder="e.g. 6.5" value={rateText} onChange={(e) => setRateText(e.target.value)} />
+        </label>
+      )}
       <label className="field">
         <span>Due date {kind === 'loan' ? '(optional)' : ''}</span>
         <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
@@ -434,15 +454,34 @@ function DebtForm({ banks, initial, busy, onSave, onCancel, onDelete }) {
 }
 
 // Pay: a spend from the envelope that also lowers what's owed.
+// For a loan, part of the payment can be interest — entered in $ (from the statement)
+// or as % a year (worked out as owed × rate ÷ 12). Only the rest (principal) lowers what's owed.
 function PaySheet({ debt, envelope, onSave, onClose }) {
   const c = debt.currency
+  const isLoan = debt.kind === 'loan'
   // Suggest the full amount for a tax bill; leave it blank for a loan (payments vary).
   const [text, setText] = useState(debt.kind === 'tax' ? String(debt.amount_owed) : '')
+  const [interestMode, setInterestMode] = useState(debt.annual_rate !== null ? 'percent' : 'amount')
+  const [interestText, setInterestText] = useState('')
+  const [rateText, setRateText] = useState(debt.annual_rate !== null ? String(debt.annual_rate) : '')
   const [paidOn, setPaidOn] = useState(todayLocal())
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const amount = parseAmount(text)
+
+  // This payment's interest, in money.
+  const rate = rateText.trim() === '' ? 0 : parseBalance(rateText.replace('%', ''))
+  const interest = !isLoan
+    ? 0
+    : interestMode === 'percent'
+      ? rate === null
+        ? null
+        : Math.round(((debt.amount_owed * rate) / 100 / 12) * 100) / 100
+      : interestText.trim() === ''
+        ? 0
+        : parseBalance(interestText)
+  const principal = amount && interest !== null ? Math.round((amount - interest) * 100) / 100 : null
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -464,12 +503,15 @@ function PaySheet({ debt, envelope, onSave, onClose }) {
           className="spend-form"
           onSubmit={async (e) => {
             e.preventDefault()
-            if (!amount) return setError('Enter the payment, like 450')
-            if (amount > debt.amount_owed) return setError(`That’s more than the ${formatMoney(debt.amount_owed, c)} owed.`)
+            if (!amount) return setError('Enter the payment, like 622')
+            if (interest === null || interest < 0) return setError('Enter the interest as a number (or leave it blank).')
+            if (interest > amount) return setError('The interest can’t be more than the payment.')
+            if (amount - interest > debt.amount_owed + 0.005)
+              return setError(`That pays off more than the ${formatMoney(debt.amount_owed, c)} owed.`)
             setBusy(true)
             setError(null)
             try {
-              await onSave({ amount, paidOn, note })
+              await onSave({ amount, paidOn, note, interest })
             } catch (err) {
               setError(friendlyError(err))
               setBusy(false)
@@ -486,9 +528,47 @@ function PaySheet({ debt, envelope, onSave, onClose }) {
               <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} required />
             </label>
           </div>
+
+          {isLoan && (
+            <div className="interest-box">
+              <div className="interest-head">
+                <span className="field-label">Of which interest</span>
+                <div className="mini-toggle" role="radiogroup" aria-label="Interest as">
+                  <button type="button" role="radio" aria-checked={interestMode === 'amount'} className={interestMode === 'amount' ? 'on' : ''} onClick={() => setInterestMode('amount')}>
+                    $
+                  </button>
+                  <button type="button" role="radio" aria-checked={interestMode === 'percent'} className={interestMode === 'percent' ? 'on' : ''} onClick={() => setInterestMode('percent')}>
+                    %
+                  </button>
+                </div>
+              </div>
+              {interestMode === 'amount' ? (
+                <label className="field">
+                  <span className="visually-hidden">Interest amount</span>
+                  <input inputMode="decimal" placeholder="From your statement, e.g. 180" value={interestText} onChange={(e) => setInterestText(e.target.value)} />
+                </label>
+              ) : (
+                <label className="field">
+                  <span className="visually-hidden">Interest rate, percent a year</span>
+                  <input inputMode="decimal" placeholder="% a year, e.g. 6.5" value={rateText} onChange={(e) => setRateText(e.target.value)} />
+                </label>
+              )}
+              <p className="hint">
+                {interestMode === 'percent'
+                  ? rate
+                    ? `${rate}% a year on ${formatMoney(debt.amount_owed, c)} ≈ ${formatMoney(interest ?? 0, c)} this month. Your lender may differ slightly; switch to $ to enter it exactly.`
+                    : 'Enter the yearly rate and the month’s interest is worked out for you.'
+                  : 'Leave blank if you don’t know; you can fix the balance later with Update owed.'}
+              </p>
+            </div>
+          )}
+
           <p className="after-line">
             From {envelope.name} (holds {formatMoney(envelope.balance, c)}).
-            {amount ? ` Then ${formatMoney(debt.amount_owed - amount, c)} left to owe.` : ''}
+            {principal !== null &&
+              ` Then ${formatMoney(Math.max(0, debt.amount_owed - principal), c)} left to owe${
+                interest > 0 ? ` · ${formatMoney(principal, c)} principal, ${formatMoney(interest, c)} interest` : ''
+              }.`}
           </p>
           {amount && amount > envelope.balance && (
             <p className="hint match-off">{envelope.name} only holds {formatMoney(envelope.balance, c)}; it will go below zero.</p>
