@@ -221,3 +221,108 @@ body {
 
 .empty { margin: 8px 4px; color: var(--muted); }
 .empty--small { font-size: 14px; margin: 0 4px; }
+
+/* ---- Step 4: Quick spend ---- */
+
+/* Rows are buttons now: reset the button look so they still look like cards. */
+button.budget-row { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+button.budget-row:active { background: #f0f0ea; }
+button.budget-row:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* The panel slides up from the bottom over a dimmed screen. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(28, 28, 26, 0.45);
+}
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 10px 20px calc(24px + env(safe-area-inset-bottom)); /* clears the iPhone home bar */
+  border-radius: 20px 20px 0 0;
+  background: var(--card);
+  animation: sheet-up 0.2s ease-out;
+}
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+
+.sheet-handle { width: 40px; height: 4px; margin: 0 auto 14px; border-radius: 2px; background: #cfcfc8; }
+.sheet-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.sheet-head h2 { margin: 0; font-size: 22px; font-weight: 600; }
+
+.spend-form { display: flex; flex-direction: column; gap: 14px; }
+.amount-field { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 2px solid var(--ink); }
+.amount-field span, .field span {
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.amount-field input {
+  border: 0;
+  outline: none;
+  padding: 0;
+  background: transparent;
+  font: 600 34px var(--mono);
+  color: var(--ink);
+}
+.spend-row { display: flex; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.field--date { flex: 0 0 auto; }
+.field input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cfcfc8;
+  border-radius: 10px;
+  background: #fafaf7;
+  font: 400 16px var(--sans);
+  color: var(--ink);
+}
+.after-line { margin: 0; font-size: 14px; color: #4a4a45; }
+.after-negative { color: var(--empty); font-weight: 600; }
+.sheet-actions { display: flex; gap: 10px; }
+.sheet-actions .secondary { margin-top: 0; flex: 0 0 auto; }
+.sheet-actions .primary { flex: 1; }
+
+.recent { display: flex; flex-direction: column; gap: 6px; margin-top: 20px; padding-top: 14px; border-top: 1px solid #ecece6; }
+.recent .section-title { margin: 0 0 2px; text-transform: none; letter-spacing: 0; font: 500 13px var(--sans); color: var(--muted); }
+.recent-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.money-in { color: var(--accent); }
+
+/* "Logged $48.20 from Groceries · Undo" */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 20;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 448px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+}
+.toast-undo {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #9fd3c2;
+  font: 600 14px var(--sans);
+  cursor: pointer;
+}
+/* Inside the row button these are <span>s, so give them block layout. */
+.bar, .bar-fill { display: block; }

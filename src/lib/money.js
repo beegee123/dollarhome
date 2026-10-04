@@ -35,3 +35,27 @@ export function itemStatus(balance, plan, currency) {
 // Lower-case and strip accents, so "creme" finds "Crème" (same as Pantry's search).
 export const normalize = (text) =>
   text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+
+// Turn what someone typed into a number: "48.2", "$48.20", "1,200" all work.
+// Returns null if it isn't a positive amount with at most 2 decimal places.
+export function parseAmount(text) {
+  const cleaned = String(text).replace(/[$,\s]/g, '').replace(/^C\$/i, '')
+  if (!/^\d*\.?\d{0,2}$/.test(cleaned) || cleaned === '' || cleaned === '.') return null
+  const value = Number(cleaned)
+  return value > 0 ? value : null
+}
+
+// Today's date as YYYY-MM-DD in YOUR time zone (toISOString would use UTC
+// and could give tomorrow's date late in the evening).
+export function todayLocal() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// "Oct 2" from "2026-10-02" (read straight from the text, so no time-zone surprises).
+export function shortDate(isoDate) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const [, m, d] = isoDate.split('-').map(Number)
+  return `${months[m - 1]} ${d}`
+}

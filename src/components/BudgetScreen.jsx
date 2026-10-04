@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import BudgetRow from './BudgetRow.jsx'
 import SearchBox from './SearchBox.jsx'
+import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
+import { deleteTransaction, logSpend } from '../api/transactions.js'
 import { supabase } from '../lib/supabase.js'
 import { formatMoney, normalize } from '../lib/money.js'
 
@@ -12,6 +14,9 @@ export default function BudgetScreen() {
   const [bankId, setBankId] = useState(null) // which tab is open
   const [query, setQuery] = useState('') // search text
   const [reloadCount, setReloadCount] = useState(0) // bump to load again
+  const [spending, setSpending] = useState(null) // { item, currency } while Quick spend is open
+  const [toast, setToast] = useState(null) // { text, undo } after a spend is logged
+  const toastTimer = useRef(null)
 
   // Load everything; again whenever reloadCount changes.
   useEffect(() => {
@@ -40,6 +45,48 @@ export default function BudgetScreen() {
     document.addEventListener('visibilitychange', handleVisible)
     return () => document.removeEventListener('visibilitychange', handleVisible)
   }, [])
+
+  // Change one item's balance on screen (and its account's total) without reloading.
+  function adjustBalance(itemId, change) {
+    setBanks((current) =>
+      current.map((b) => ({
+        ...b,
+        accounts: b.accounts.map((a) => {
+          if (!a.items.some((i) => i.id === itemId)) return a
+          return {
+            ...a,
+            total: a.total + change,
+            items: a.items.map((i) => (i.id === itemId ? { ...i, balance: i.balance + change } : i)),
+          }
+        }),
+      })),
+    )
+  }
+
+  function showToast(text, undo) {
+    clearTimeout(toastTimer.current)
+    setToast({ text, undo })
+    toastTimer.current = setTimeout(() => setToast(null), 6000) // gone after 6 seconds
+  }
+
+  // Save first, THEN change the screen: a spend is money, so the bar should
+  // only move once the database has it.
+  async function saveSpend({ amount, note, occurredOn }) {
+    const { item, currency } = spending
+    const id = await logSpend({ categoryId: item.id, amount, note, occurredOn }) // throws on failure; QuickSpend shows it
+    adjustBalance(item.id, -amount)
+    setSpending(null)
+    showToast(`Logged ${formatMoney(amount, currency)} from ${item.name}`, async () => {
+      setToast(null)
+      try {
+        await deleteTransaction(id)
+        adjustBalance(item.id, amount)
+      } catch {
+        showToast('Couldn’t undo. Reloading…')
+        setReloadCount((n) => n + 1)
+      }
+    })
+  }
 
   if (loadError) {
     return (
@@ -127,17 +174,45 @@ export default function BudgetScreen() {
             {search && sections.length === 0 && <p className="empty">No budget items match “{query.trim()}”.</p>}
 
             {sections.map(({ bank: b, account, title, items }) => (
-              <AccountSection key={account.id} bank={b} account={account} title={title} items={items} searching={!!search} />
+              <AccountSection
+                key={account.id}
+                bank={b}
+                account={account}
+                title={title}
+                items={items}
+                searching={!!search}
+                onTapItem={(item) => setSpending({ item, currency: b.currency })}
+              />
             ))}
           </main>
         </>
+      )}
+
+      {spending && (
+        <QuickSpend
+          item={spending.item}
+          currency={spending.currency}
+          onSave={saveSpend}
+          onClose={() => setSpending(null)}
+        />
+      )}
+
+      {toast && (
+        <div className="toast" role="status">
+          <span>{toast.text}</span>
+          {toast.undo && (
+            <button type="button" className="toast-undo" onClick={toast.undo}>
+              Undo
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
 // One account: its title, the match check against the bank, Unassigned, then its budget items.
-function AccountSection({ bank, account, title, items, searching }) {
+function AccountSection({ bank, account, title, items, searching, onTapItem }) {
   const off = Math.round((account.bank_balance - account.total) * 100) / 100 // round away float dust
   const unassigned = account.unassigned?.balance ?? 0
 
@@ -165,7 +240,7 @@ function AccountSection({ bank, account, title, items, searching }) {
       {items.length === 0 && !searching && <p className="empty empty--small">No budget items in this account yet.</p>}
 
       {items.map((item) => (
-        <BudgetRow key={item.id} item={item} currency={bank.currency} />
+        <BudgetRow key={item.id} item={item} currency={bank.currency} onTap={() => onTapItem(item)} />
       ))}
     </section>
   )
