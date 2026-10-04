@@ -20,6 +20,7 @@ export default function MoveSheet({ banks, fromId: initialFrom, onSave, onClose 
     const list = []
     banks.forEach((b) =>
       b.accounts.forEach((a) => {
+        if (a.kind === 'credit') return // a card's ledger isn't money you can move
         if (a.unassigned) list.push({ ...a.unassigned, name: 'Unassigned', bank: b, account: a })
         a.items.forEach((i) => list.push({ ...i, bank: b, account: a }))
       }),

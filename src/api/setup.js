@@ -15,7 +15,7 @@ export async function fetchSetup() {
     supabase.from('banks').select('id, name, currency, sort_order, archived').order('sort_order').order('name'),
     supabase
       .from('accounts')
-      .select('id, bank_id, name, bank_balance, balance_checked_at, sort_order, archived')
+      .select('id, bank_id, name, kind, bank_balance, balance_checked_at, sort_order, archived')
       .order('sort_order')
       .order('name'),
   ])
@@ -109,7 +109,7 @@ export async function setBankBalance(accountId, amount) {
 export async function fetchAccountItems(accountId) {
   const { data: account, error } = await supabase
     .from('accounts')
-    .select('id, bank_id, name, bank_balance, balance_checked_at, sort_order, archived, bank:banks (id, name, currency)')
+    .select('id, bank_id, name, kind, payment_category_id, bank_balance, balance_checked_at, sort_order, archived, bank:banks (id, name, currency)')
     .eq('id', accountId)
     .single()
   if (error) throw error

@@ -14,7 +14,7 @@ export async function fetchBudget() {
       .order('name'),
     supabase
       .from('accounts')
-      .select('id, bank_id, name, bank_balance, sort_order')
+      .select('id, bank_id, name, kind, payment_category_id, bank_balance, sort_order')
       .eq('archived', false)
       .order('sort_order')
       .order('name'),
@@ -45,6 +45,8 @@ export async function fetchBudget() {
           ...account,
           bank_balance: Number(account.bank_balance),
           total,
+          // A card's total is minus what it owes (its ledger), so owed = −total.
+          owed: account.kind === 'credit' ? Math.round(-total * 100) / 100 : 0,
           unassigned: cats.find((c) => c.is_unassigned) ?? null,
           items: cats.filter((c) => !c.is_unassigned),
         }

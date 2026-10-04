@@ -8,6 +8,9 @@ import { formatMoney, parseBalance } from '../lib/money.js'
 //   onSave    — async function(amount); throws if saving failed
 //   onClose   — function
 export default function BalanceSheet({ account, currency, onSave, onClose }) {
+  // For a credit card the numbers are what's OWED: the statement vs what DollarHome says the card owes.
+  const isCard = account.kind === 'credit'
+  const held = isCard ? (account.owed ?? -account.total) : account.total
   const [text, setText] = useState(String(account.bank_balance))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -25,7 +28,7 @@ export default function BalanceSheet({ account, currency, onSave, onClose }) {
   }, [onClose])
 
   const amount = parseBalance(text)
-  const diff = amount === null ? null : Math.round((amount - account.total) * 100) / 100
+  const diff = amount === null ? null : Math.round((amount - held) * 100) / 100
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -49,12 +52,12 @@ export default function BalanceSheet({ account, currency, onSave, onClose }) {
         <div className="sheet-handle" aria-hidden="true" />
         <div className="sheet-head">
           <h2 id="balance-title">{account.name}</h2>
-          <span className="muted">Update bank balance</span>
+          <span className="muted">{isCard ? 'Update statement balance' : 'Update bank balance'}</span>
         </div>
 
         <form className="spend-form" onSubmit={handleSubmit}>
           <label className="amount-field">
-            <span>Your bank says</span>
+            <span>{isCard ? 'Your card app says you owe' : 'Your bank says'}</span>
             <input
               ref={inputRef}
               inputMode="decimal"
@@ -65,20 +68,28 @@ export default function BalanceSheet({ account, currency, onSave, onClose }) {
           </label>
 
           <p className="after-line">
-            DollarHome holds <span className="money">{formatMoney(account.total, currency)}</span> in this account.
+            {isCard ? 'DollarHome says this card owes ' : 'DollarHome holds '}
+            <span className="money">{formatMoney(held, currency)}</span>
+            {isCard ? '.' : ' in this account.'}
             {diff === 0 && <strong className="match-ok"> They match.</strong>}
             {diff !== null && diff !== 0 && (
               <strong className="match-off">
                 {' '}
-                The bank has {formatMoney(Math.abs(diff), currency)} {diff > 0 ? 'more' : 'less'}.
+                {isCard ? 'The card app shows' : 'The bank has'} {formatMoney(Math.abs(diff), currency)} {diff > 0 ? 'more' : 'less'}.
               </strong>
             )}
           </p>
-          {diff !== null && diff < 0 && (
+          {!isCard && diff !== null && diff < 0 && (
             <p className="hint">Less in the bank usually means a spend you haven’t logged yet.</p>
           )}
-          {diff !== null && diff > 0 && (
+          {!isCard && diff !== null && diff > 0 && (
             <p className="hint">More in the bank usually means income you haven’t added yet.</p>
+          )}
+          {isCard && diff !== null && diff > 0 && (
+            <p className="hint">Owing more usually means a card purchase you haven’t logged, or interest.</p>
+          )}
+          {isCard && diff !== null && diff < 0 && (
+            <p className="hint">Owing less usually means a payment or refund you haven’t logged.</p>
           )}
 
           {error && <p className="notice" role="alert">{error}</p>}

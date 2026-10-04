@@ -8,7 +8,9 @@ const COLORS = ['#2f5d50', '#b86a00', '#e3ede9', '#d9a441', '#7fb3a3', '#f4f4f1'
 //   goal     — { name, planned_amount, target_date }
 //   currency
 //   onClose
-export default function Celebration({ goal, currency, onClose }) {
+//   title    — headline (default "Goal reached!"; Owed uses "Paid off!")
+//   verb     — word after the amount (default "saved")
+export default function Celebration({ goal, currency, onClose, title = 'Goal reached!', verb = 'saved' }) {
   const buttonRef = useRef(null)
 
   // 40 pieces of confetti, each with its own spot, colour, size, delay and spin.
@@ -68,10 +70,10 @@ export default function Celebration({ goal, currency, onClose }) {
           <circle cx="28" cy="28" r="28" fill="#e3ede9" />
           <path d="M28 13l4.3 9.2 10 1.2-7.4 6.9 2 9.9L28 35.3l-8.9 4.9 2-9.9-7.4-6.9 10-1.2z" fill="#2f5d50" />
         </svg>
-        <h2 id="celebrate-title">Goal reached!</h2>
+        <h2 id="celebrate-title">{title}</h2>
         <p className="celebrate-name">{goal.name}</p>
         <p className="celebrate-amount">
-          <span className="money">{formatMoney(goal.planned_amount, currency)}</span> saved
+          <span className="money">{formatMoney(goal.planned_amount, currency)}</span> {verb}
         </p>
         {early > 0 && (
           <p className="celebrate-early">

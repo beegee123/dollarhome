@@ -6,12 +6,14 @@ import IncomeIn from './IncomeIn.jsx'
 import AssignSheet from './AssignSheet.jsx'
 import MoveSheet from './MoveSheet.jsx'
 import Celebration from './Celebration.jsx'
+import PayCardSheet from './PayCardSheet.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
 import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMoney } from '../api/transactions.js'
 import { setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
+import { cardSpend, payCard } from '../api/cards.js'
 import { formatMoney, normalize, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -30,6 +32,7 @@ export default function BudgetScreen() {
   const [moveFrom, setMoveFrom] = useState(undefined) // undefined = closed; null or an item id = open
   const [reminders, setReminders] = useState([]) // "Move $400 from Truist Checking to Truist Savings" 
   const toastTimer = useRef(null)
+  const [payingCard, setPayingCard] = useState(null) // { card, bank, envelope } while Pay card is open
   const [celebrating, setCelebrating] = useState(null) // { goal, currency } when a goal was just reached
   const goalsFunded = useRef(null) // goal id → funded? from the previous load (null = first load)
 
@@ -105,8 +108,19 @@ export default function BudgetScreen() {
 
   // Save first, THEN change the screen: a spend is money, so the bar should
   // only move once the database has it.
-  async function saveSpend({ amount, note, occurredOn }) {
+  async function saveSpend({ amount, note, occurredOn, cardId }) {
     const { item, currency } = spending
+    if (cardId) {
+      // Paid with a card: the item drops, the card's payment envelope rises, the card owes more.
+      const card = banks.flatMap((b) => b.accounts).find((a) => a.id === cardId)
+      const pairId = await cardSpend({ categoryId: item.id, cardId, amount, spentOn: occurredOn, note })
+      setSpending(null)
+      setReloadCount((n) => n + 1)
+      showToast(`Logged ${formatMoney(amount, currency)} from ${item.name} on ${card?.name ?? 'card'}`, () =>
+        undoPairs([pairId]),
+      )
+      return
+    }
     const id = await logSpend({ categoryId: item.id, amount, note, occurredOn }) // throws on failure; QuickSpend shows it
     adjustBalance(item.id, -amount)
     setSpending(null)
@@ -239,6 +253,9 @@ export default function BudgetScreen() {
           <Link to="/wishlist" className="small-button">
             Wishlist
           </Link>
+          <Link to="/owed" className="small-button">
+            Owed
+          </Link>
           <Link to="/analytics" className="small-button">
             Analytics
           </Link>
@@ -317,6 +334,8 @@ export default function BudgetScreen() {
                 onTapItem={(item) => setSpending({ item, currency: b.currency })}
                 onUpdateBalance={() => setBalanceFor({ account, currency: b.currency })}
                 onAssign={() => setAssignFor({ account, currency: b.currency })}
+                envelopeOf={(id) => findItem(banks, id)}
+                onPayCard={(envelope) => setPayingCard({ card: account, bank: b, envelope })}
               />
             ))}
           </main>
@@ -349,6 +368,8 @@ export default function BudgetScreen() {
         <QuickSpend
           item={spending.item}
           currency={spending.currency}
+          cards={banks.flatMap((b) => (b.currency === spending.currency ? b.accounts.filter((a) => a.kind === 'credit') : []))}
+          onPairDeleted={() => setReloadCount((n) => n + 1)}
           onSave={saveSpend}
           onClose={() => setSpending(null)}
           onMove={() => {
@@ -376,6 +397,22 @@ export default function BudgetScreen() {
         />
       )}
 
+      {payingCard && (
+        <PayCardSheet
+          card={payingCard.card}
+          envelope={payingCard.envelope}
+          currency={payingCard.bank.currency}
+          onClose={() => setPayingCard(null)}
+          onSave={async ({ amount, paidOn }) => {
+            const pairId = await payCard({ cardId: payingCard.card.id, amount, paidOn })
+            const name = payingCard.card.name
+            setPayingCard(null)
+            setReloadCount((n) => n + 1)
+            showToast(`Paid ${formatMoney(amount, payingCard.bank.currency)} to ${name}`, () => undoPairs([pairId]))
+          }}
+        />
+      )}
+
       {celebrating && (
         <Celebration goal={celebrating.goal} currency={celebrating.currency} onClose={() => setCelebrating(null)} />
       )}
@@ -395,7 +432,18 @@ export default function BudgetScreen() {
 }
 
 // One account: its title, the match check against the bank, Unassigned, then its budget items.
-function AccountSection({ bank, account, title, items, searching, onTapItem, onUpdateBalance, onAssign }) {
+// Find a budget item anywhere (used to show a card's payment envelope).
+function findItem(banks, id) {
+  for (const b of banks) for (const a of b.accounts) for (const i of a.items) if (i.id === id) return { ...i, accountName: a.name }
+  return null
+}
+
+function AccountSection({ bank, account, title, items, searching, onTapItem, onUpdateBalance, onAssign, envelopeOf, onPayCard }) {
+  if (account.kind === 'credit') {
+    // Cards have no budget items; they don't show in search results.
+    if (searching) return null
+    return <CardSection bank={bank} card={account} title={title} envelope={envelopeOf(account.payment_category_id)} onUpdateBalance={onUpdateBalance} onPay={onPayCard} />
+  }
   const off = Math.round((account.bank_balance - account.total) * 100) / 100 // round away float dust
   const unassigned = account.unassigned?.balance ?? 0
 
@@ -441,6 +489,58 @@ function AccountSection({ bank, account, title, items, searching, onTapItem, onU
       {items.map((item) => (
         <BudgetRow key={item.id} item={item} currency={bank.currency} onTap={() => onTapItem(item)} />
       ))}
+    </section>
+  )
+}
+
+// A credit card on its bank's tab: what it owes, whether the payment envelope covers it, Pay card.
+function CardSection({ bank, card, title, envelope, onUpdateBalance, onPay }) {
+  const c = bank.currency
+  const off = Math.round((card.bank_balance - card.owed) * 100) / 100 // statement vs DollarHome
+  const held = envelope?.balance ?? 0
+  const short = Math.round((card.owed - held) * 100) / 100
+
+  return (
+    <section className="account-section" aria-label={title}>
+      <h2 className="section-title section-title--split">
+        <span>
+          {title} <span className="card-badge">CARD</span>
+        </span>
+        <button
+          type="button"
+          className={`match match-button ${off === 0 ? 'match-ok' : 'match-off'}`}
+          onClick={onUpdateBalance}
+          aria-label={`Update statement balance for ${card.name}`}
+        >
+          {off === 0 ? 'Matches statement' : `Off by ${formatMoney(Math.abs(off), c)} vs statement`}
+          <span className="match-edit">Update</span>
+        </button>
+      </h2>
+      <div className="card-row">
+        <div className="setup-row-main">
+          <span>
+            Owes <span className="money strong">{formatMoney(card.owed, c)}</span>
+          </span>
+          <span className="muted setup-row-sub">
+            {envelope ? (
+              <>
+                {envelope.name} ({envelope.accountName}) holds <span className="money">{formatMoney(held, c)}</span>
+                {card.owed > 0 &&
+                  (short <= 0 ? (
+                    <strong className="match-ok"> · covered</strong>
+                  ) : (
+                    <strong className="over-text"> · {formatMoney(short, c)} short</strong>
+                  ))}
+              </>
+            ) : (
+              'Payment envelope missing'
+            )}
+          </span>
+        </div>
+        <button type="button" className="small-button" disabled={!envelope || card.owed <= 0} onClick={() => onPay(envelope)}>
+          Pay card
+        </button>
+      </div>
     </section>
   )
 }

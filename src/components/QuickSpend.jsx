@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { deleteTransaction, fetchRecent } from '../api/transactions.js'
+import { deletePairs, deleteTransaction, fetchRecent } from '../api/transactions.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
 
 const KIND_LABELS = { income: 'Income', spend: 'Spent', move: 'Moved', transfer: 'Transfer', opening: 'Starting balance' }
@@ -12,13 +12,16 @@ const KIND_LABELS = { income: 'Income', spend: 'Spent', move: 'Moved', transfer:
 //   onClose   — function, closes the panel
 //   onMove    — function, switches to Move money starting from this item
 //   onDeleted — function(amount), after a past spend was deleted (amount is negative)
-export default function QuickSpend({ item, currency, onSave, onClose, onMove, onDeleted }) {
+//   cards     — credit cards in this currency, for "Paid with"
+//   onPairDeleted — function, after a card spend (several rows) was deleted
+export default function QuickSpend({ item, currency, onSave, onClose, onMove, onDeleted, cards = [], onPairDeleted }) {
   const [amountText, setAmountText] = useState('')
   const [note, setNote] = useState('')
   const [occurredOn, setOccurredOn] = useState(todayLocal())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState(null)
+  const [cardId, setCardId] = useState('') // '' = paid from the bank account (debit/cash)
   const [recentError, setRecentError] = useState(null)
   const amountRef = useRef(null)
 
@@ -55,7 +58,7 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
     setBusy(true)
     setError(null)
     try {
-      await onSave({ amount, note, occurredOn })
+      await onSave({ amount, note, occurredOn, cardId: cardId || null })
       // On success the screen closes this panel.
     } catch {
       setError('Couldn’t save. Check your connection and try again.')
@@ -111,6 +114,28 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
             </label>
           </div>
 
+          {/* Paid with: only shown when you have a card in this currency. */}
+          {cards.length > 0 && (
+            <fieldset className="chips">
+              <legend>Paid with</legend>
+              <label className={cardId === '' ? 'on' : ''}>
+                <input type="radio" name="paid-with" checked={cardId === ''} onChange={() => setCardId('')} />
+                Debit / cash
+              </label>
+              {cards.map((c) => (
+                <label key={c.id} className={cardId === c.id ? 'on' : ''}>
+                  <input type="radio" name="paid-with" checked={cardId === c.id} onChange={() => setCardId(c.id)} />
+                  {c.name}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {cardId && (
+            <p className="hint">
+              The money moves into {cards.find((c) => c.id === cardId)?.name}’s payment envelope, ready for the bill.
+            </p>
+          )}
+
           <p className={`after-line ${after < 0 ? 'after-negative' : ''}`}>
             After this: <span className="money">{formatMoney(after, currency)}</span> left
             {after < 0 && ' — more than this item holds'}
@@ -159,6 +184,14 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
                       if (!window.confirm(`Delete this ${formatMoney(-t.amount, currency)} spend? ${item.name} gets it back.`)) return
                       setRecentError(null)
                       try {
+                        if (t.pair_id) {
+                          // A card spend: remove all its rows (item, payment envelope, card).
+                          await deletePairs([t.pair_id])
+                          setRecent((rows) => rows.filter((r) => r.id !== t.id))
+                          onPairDeleted?.()
+                          onClose()
+                          return
+                        }
                         await deleteTransaction(t.id)
                         setRecent((rows) => rows.filter((r) => r.id !== t.id))
                         onDeleted?.(t.amount)

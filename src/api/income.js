@@ -19,7 +19,8 @@ export async function fetchSources() {
 export async function fetchSourceForm(sourceId) {
   const [banks, accounts, items, source] = await Promise.all([
     supabase.from('banks').select('id, name, currency').eq('archived', false).order('sort_order').order('name'),
-    supabase.from('accounts').select('id, bank_id, name').eq('archived', false).order('sort_order').order('name'),
+    // Paychecks land in bank accounts, never on a credit card.
+    supabase.from('accounts').select('id, bank_id, name').eq('archived', false).eq('kind', 'cash').order('sort_order').order('name'),
     supabase
       .from('categories')
       .select('id, account_id, name, planned_amount')

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchAnalytics } from '../api/analytics.js'
 import { friendlyError } from '../lib/errors.js'
-import { formatMoney } from '../lib/money.js'
+import { formatMoney, shortDate } from '../lib/money.js'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -118,6 +118,14 @@ export default function AnalyticsScreen() {
     wishBy[c.id].count += 1
   })
   const wishRows = Object.values(wishBy).sort((a, b) => a.have / a.need - b.have / b.need)
+
+  // ---- Owed: loans' payoff progress and the next tax bill, in this bank's currency ----
+  const owedHere = data.debts.filter((d) => d.currency === currency)
+  const loanRows = owedHere.filter((d) => d.kind === 'loan' && d.original_amount > 0)
+  const nextTax = owedHere
+    .filter((d) => d.kind === 'tax' && d.due_date)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))[0]
+  const owedTotal = owedHere.reduce((s, d) => s + d.amount_owed, 0)
 
   const activeBanks = data.banks.filter((b) => !b.archived)
 
@@ -244,6 +252,42 @@ export default function AnalyticsScreen() {
               {trend.some((p) => p.partial) && ` · ${monthShort(thisMonth)} still in progress`}
             </p>
             <TrendChart points={trend} money={money} />
+          </section>
+
+          {/* Owed: payoff progress (shown per currency, like everything else here) */}
+          <section className="card">
+            <div className="card-head">
+              <h2>Owed ({currency})</h2>
+              {owedTotal > 0 && <span className="money strong">{money(owedTotal)}</span>}
+            </div>
+            {owedHere.length === 0 && (
+              <p className="card-sub">
+                Nothing owed in {currency}. <Link to="/owed">Open Owed</Link>
+              </p>
+            )}
+            {loanRows.map((d) => {
+              const paid = Math.max(0, d.original_amount - d.amount_owed)
+              return (
+                <div key={d.name} className="spend-bar">
+                  <div className="spend-bar-top">
+                    <span className="spend-bar-name">{d.name}</span>
+                    <span className="spend-bar-nums">
+                      <span className="money">{money(paid)}</span>
+                      <span className="muted"> paid of {money(d.original_amount)}</span>
+                    </span>
+                  </div>
+                  <div className="spend-track" role="img" aria-label={`${d.name}: ${money(paid)} paid of ${money(d.original_amount)}`}>
+                    <div className="spend-fill" style={{ width: `${Math.min(100, (paid / d.original_amount) * 100)}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+            {nextTax && (
+              <p className="card-sub card-sub--flat">
+                Next bill: <strong>{nextTax.name}</strong> · <span className="money">{money(nextTax.amount_owed)}</span> due{' '}
+                {shortDate(nextTax.due_date)}
+              </p>
+            )}
           </section>
 
           {/* 4. Wishlist progress */}

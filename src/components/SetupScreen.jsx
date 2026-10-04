@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { supabase } from '../lib/supabase.js'
 import { addAccount, addBank, deleteBank, fetchSetup, restartBalances, startFresh, swapOrder, updateRow } from '../api/setup.js'
 import { fetchBudget } from '../api/budget.js'
+import { addCard } from '../api/cards.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -101,6 +102,7 @@ export default function SetupScreen() {
           <BankCard
             key={bank.id}
             bank={bank}
+            allBanks={active}
             totals={totals}
             busy={busy}
             run={run}
@@ -139,7 +141,7 @@ export default function SetupScreen() {
 }
 
 // One bank: a header with a single Edit button, then one row per account.
-function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown }) {
+function BankCard({ bank, allBanks, totals, busy, run, nextOrder, onUp, onDown }) {
   const [editing, setEditing] = useState(false) // Edit opens rename / order / archive
   const [renaming, setRenaming] = useState(false)
   const [blocked, setBlocked] = useState(null)
@@ -224,13 +226,20 @@ function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown }) {
 
       {/* One compact, tappable row per account. */}
       {activeAccounts.map((account) => {
-        const off = Math.round((account.bank_balance - (totals[account.id] ?? 0)) * 100) / 100
+        const isCard = account.kind === 'credit'
+        // A card's DollarHome total is minus what it owes, so compare the statement with −total.
+        const held = isCard ? -(totals[account.id] ?? 0) : (totals[account.id] ?? 0)
+        const off = Math.round((account.bank_balance - held) * 100) / 100
         return (
           <Link key={account.id} to={`/setup/accounts/${account.id}`} className="account-link">
             <span className="setup-row-main">
-              <span className="setup-row-name">{account.name}</span>
+              <span className="setup-row-name">
+                {account.name}
+                {isCard && <span className="card-badge">CARD</span>}
+              </span>
               <span className="muted setup-row-sub">
-                Bank <span className="money">{formatMoney(account.bank_balance, bank.currency)}</span>
+                {isCard ? 'Owes ' : 'Bank '}
+                <span className="money">{formatMoney(account.bank_balance, bank.currency)}</span>
                 {off === 0 ? (
                   <span className="match-ok"> · matches</span>
                 ) : (
@@ -247,10 +256,12 @@ function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown }) {
 
       <AddAccountForm
         bank={bank}
+        allBanks={allBanks}
         busy={busy}
         onAdd={(name, startingBalance) =>
           run(() => addAccount({ bankId: bank.id, name, startingBalance, sortOrder: nextOrder(bank.accounts) }))
         }
+        onAddCard={(name, owed, paysFromAccountId) => run(() => addCard({ bankId: bank.id, name, owed, paysFromAccountId }))}
       />
 
       {archivedAccounts.length > 0 && (
@@ -335,16 +346,24 @@ function AddBankForm({ busy, onAdd }) {
   )
 }
 
-function AddAccountForm({ bank, busy, onAdd }) {
+function AddAccountForm({ bank, allBanks, busy, onAdd, onAddCard }) {
   const [open, setOpen] = useState(false)
+  const [kind, setKind] = useState('cash') // 'cash' = bank account, 'credit' = credit card
   const [name, setName] = useState('')
   const [balanceText, setBalanceText] = useState('')
+  const [paysFrom, setPaysFrom] = useState('')
   const [error, setError] = useState(null)
+  const isCard = kind === 'credit'
+
+  // A card is paid from a bank account in the same currency (any bank).
+  const payers = allBanks
+    .filter((b) => b.currency === bank.currency)
+    .flatMap((b) => b.accounts.filter((a) => !a.archived && a.kind !== 'credit').map((a) => ({ ...a, bankName: b.name })))
 
   if (!open) {
     return (
       <button type="button" className="link-button add-link" onClick={() => setOpen(true)}>
-        + Add account
+        + Add account or card
       </button>
     )
   }
@@ -356,31 +375,65 @@ function AddAccountForm({ bank, busy, onAdd }) {
         e.preventDefault()
         const balance = balanceText.trim() === '' ? 0 : parseBalance(balanceText)
         if (!name.trim()) return
-        if (balance === null) {
-          setError('Enter today’s balance, like 1865.40 (or leave it blank for $0)')
+        if (balance === null || (isCard && balance < 0)) {
+          setError(isCard ? 'Enter what the card owes today, like 640 (or leave it blank for $0)' : 'Enter today’s balance, like 1865.40 (or leave it blank for $0)')
+          return
+        }
+        if (isCard && !paysFrom) {
+          setError('Choose the bank account you pay this card from.')
           return
         }
         setError(null)
-        if (await onAdd(name.trim(), balance)) {
+        const ok = isCard ? await onAddCard(name.trim(), balance, paysFrom) : await onAdd(name.trim(), balance)
+        if (ok) {
           setName('')
           setBalanceText('')
+          setPaysFrom('')
           setOpen(false)
         }
       }}
     >
+      <fieldset className="segmented">
+        <legend>Type</legend>
+        <label className={!isCard ? 'on' : ''}>
+          <input type="radio" name={`acct-kind-${bank.id}`} checked={!isCard} onChange={() => setKind('cash')} />
+          Bank account
+        </label>
+        <label className={isCard ? 'on' : ''}>
+          <input type="radio" name={`acct-kind-${bank.id}`} checked={isCard} onChange={() => setKind('credit')} />
+          Credit card
+        </label>
+      </fieldset>
       <label className="field">
-        <span>Account name</span>
-        <input placeholder="e.g. Checking" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
+        <span>{isCard ? 'Card name' : 'Account name'}</span>
+        <input placeholder={isCard ? 'e.g. Visa' : 'e.g. Checking'} value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
       </label>
       <label className="field">
-        <span>Today’s balance ({bank.currency})</span>
+        <span>{isCard ? `Owed today (${bank.currency})` : `Today’s balance (${bank.currency})`}</span>
         <input inputMode="decimal" placeholder="0.00" value={balanceText} onChange={(e) => setBalanceText(e.target.value)} />
       </label>
-      <p className="hint">This goes into the account’s Unassigned, ready to give each dollar a home.</p>
+      {isCard && (
+        <label className="field">
+          <span>Paid from</span>
+          <select className="field-select" value={paysFrom} onChange={(e) => setPaysFrom(e.target.value)}>
+            <option value="">Choose a {bank.currency} account…</option>
+            {payers.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.bankName} · {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <p className="hint">
+        {isCard
+          ? 'DollarHome adds a “' + (name.trim() || 'Card') + ' payment” envelope to that account. Spending on the card sets money aside there for the bill.'
+          : 'This goes into the account’s Unassigned, ready to give each dollar a home.'}
+      </p>
       {error && <p className="notice">{error}</p>}
       <div className="inline-form">
         <button type="submit" className="small-button" disabled={busy || !name.trim()}>
-          Add account
+          {isCard ? 'Add card' : 'Add account'}
         </button>
         <button type="button" className="small-button" onClick={() => setOpen(false)}>
           Cancel

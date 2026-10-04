@@ -883,3 +883,34 @@ details > summary {
   .confetti { display: none; }
   .celebrate-card { animation: none; }
 }
+
+/* ---- Step 13b: Owed ---- */
+.debt { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid #ecece6; }
+.card h2 + .debt { border-top: 0; padding-top: 0; }
+.debt-name { min-height: 32px; padding: 0; font: 600 15px var(--sans); color: var(--ink); text-align: left; }
+.debt-sub { font-size: 13px; }
+.card-sub--flat { margin: 0; }
+
+/* ---- Step 14: credit cards ---- */
+.card-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #ecece6;
+  font: 600 10px var(--mono);
+  letter-spacing: 0.06em;
+  color: #4a4a45;
+  vertical-align: middle;
+}
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.card-note { margin: -4px 0 16px; }
+[hidden] { display: none !important; }

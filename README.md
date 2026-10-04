@@ -28,6 +28,8 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 5. `005_start_fresh.sql` — `start_fresh` function: deletes all of your own DollarHome data (Setup → Reset → Delete everything)
 6. `006_resets.sql` — `restart_balances` (keep the setup, clear the activity) and `delete_bank` (one bank and everything under it)
 7. `007_targets.sql` — budget item targets: monthly, or save up to an amount by a date
+8. `008_owed.sql` — Owed: loans and tax bills (`debts`), `pay_debt` / `unpay_debt`, and Delete everything now clears them too
+9. `009_credit_cards.sql` — credit cards: account kind, payment envelopes, `add_card`, `card_spend`, `pay_card`
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

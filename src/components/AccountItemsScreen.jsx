@@ -76,7 +76,9 @@ export default function AccountItemsScreen() {
     0,
   )
   const nextOrder = Math.max(-1, ...items.map((i) => i.sort_order)) + 1
-  const off = Math.round((account.bank_balance - total) * 100) / 100
+  const isCard = account.kind === 'credit'
+  const owed = -total // a card's total is minus what it owes
+  const off = Math.round((account.bank_balance - (isCard ? owed : total)) * 100) / 100
   const position = siblings.findIndex((s) => s.id === account.id)
 
   // Only an empty budget item can be archived.
@@ -121,7 +123,8 @@ export default function AccountItemsScreen() {
       <button type="button" className="balance-card" onClick={() => setBalanceOpen(true)}>
         <span className="setup-row-main">
           <span>
-            Bank says <span className="money strong">{formatMoney(account.bank_balance, currency)}</span>
+            {isCard ? 'Statement says it owes ' : 'Bank says '}
+            <span className="money strong">{formatMoney(account.bank_balance, currency)}</span>
           </span>
           <span className="muted setup-row-sub">
             {account.balance_checked_at ? `Checked ${shortDate(account.balance_checked_at.slice(0, 10))}` : 'Not checked yet'}
@@ -130,7 +133,8 @@ export default function AccountItemsScreen() {
             ) : (
               <span className="match-off"> · off by {formatMoney(Math.abs(off), currency)}</span>
             )}
-            {unassigned !== 0 && ` · ${formatMoney(unassigned, currency)} unassigned`}
+            {!isCard && unassigned !== 0 && ` · ${formatMoney(unassigned, currency)} unassigned`}
+            {isCard && ` · DollarHome says ${formatMoney(owed, currency)}`}
           </span>
         </span>
         <span className="small-button">Update</span>
@@ -142,7 +146,14 @@ export default function AccountItemsScreen() {
         </p>
       )}
 
-      <section className="bank-card">
+      {isCard && (
+        <p className="hint card-note">
+          A credit card has no budget items. Spend from your envelopes and choose this card under <strong>Paid with</strong>;
+          the money is set aside in its payment envelope until you tap <strong>Pay card</strong> on Budget.
+        </p>
+      )}
+
+      <section className="bank-card" hidden={isCard}>
         <div className="bank-card-head">
           <h2>Budget items</h2>
           <span className="muted setup-row-sub">
@@ -272,7 +283,7 @@ export default function AccountItemsScreen() {
 
       {balanceOpen && (
         <BalanceSheet
-          account={{ ...account, total }}
+          account={{ ...account, total, owed }}
           currency={currency}
           onClose={() => setBalanceOpen(false)}
           onSave={async (amount) => {

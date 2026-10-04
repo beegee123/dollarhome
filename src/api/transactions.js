@@ -23,7 +23,7 @@ export async function logSpend({ categoryId, amount, note, occurredOn }) {
 export async function fetchRecent(categoryId, limit = 5) {
   const { data, error } = await supabase
     .from('transactions')
-    .select('id, amount, kind, note, occurred_on, created_at')
+    .select('id, amount, kind, note, occurred_on, created_at, pair_id')
     .eq('category_id', categoryId)
     .order('occurred_on', { ascending: false })
     .order('created_at', { ascending: false })
