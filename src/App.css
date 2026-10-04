@@ -36,3 +36,56 @@ body {
 
 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); }
 .muted { color: var(--muted); }
+
+/* ---- Step 1b: messages, buttons and the sign-in form ---- */
+.center-message {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+.center-message p { margin: 0; }
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f7e4e1;
+  color: #8a2a1f;
+  font-size: 14px;
+}
+
+.primary,
+.secondary {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font: 600 15px var(--sans);
+  cursor: pointer;
+}
+.primary { border: 0; background: var(--accent); color: #fff; }
+.secondary { border: 1px solid var(--ink); background: var(--card); color: var(--ink); margin-top: 16px; }
+.primary:disabled { opacity: 0.6; cursor: default; }
+
+.sign-in { display: flex; flex-direction: column; gap: 16px; }
+.sign-in label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.sign-in input {
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #cfcfc8;
+  border-radius: 10px;
+  background: var(--card);
+  font: 400 16px var(--sans);
+  color: var(--ink);
+}
