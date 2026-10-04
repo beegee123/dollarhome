@@ -266,7 +266,11 @@ function AccountSection({ bank, account, title, items, searching, onTapItem, onU
         </div>
       )}
 
-      {items.length === 0 && !searching && <p className="empty empty--small">No budget items in this account yet.</p>}
+      {items.length === 0 && !searching && (
+        <p className="empty empty--small">
+          No budget items yet. <Link to={`/setup/accounts/${account.id}`}>Add some</Link>
+        </p>
+      )}
 
       {items.map((item) => (
         <BudgetRow key={item.id} item={item} currency={bank.currency} onTap={() => onTapItem(item)} />

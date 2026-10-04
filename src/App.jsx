@@ -4,6 +4,7 @@ import { supabase, missingConfig } from './lib/supabase.js'
 import SignIn from './components/SignIn.jsx'
 import BudgetScreen from './components/BudgetScreen.jsx'
 import SetupScreen from './components/SetupScreen.jsx'
+import AccountItemsScreen from './components/AccountItemsScreen.jsx'
 
 // App decides WHICH screen to show: setup problem, loading, sign-in, or the app itself.
 export default function App() {
@@ -45,6 +46,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<BudgetScreen />} />
       <Route path="/setup" element={<SetupScreen />} />
+      {/* :accountId is a placeholder — /setup/accounts/abc123 shows account abc123's budget items */}
+      <Route path="/setup/accounts/:accountId" element={<AccountItemsScreen />} />
       {/* Any unknown address goes back to the Budget. */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

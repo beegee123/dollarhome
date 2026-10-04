@@ -81,7 +81,7 @@ export async function updateRow(table, id, changes) {
   }
 }
 
-// Swap the order of two neighbours (the ↑ / ↓ buttons).
+// Swap the order of two neighbours (the ↑ / ↓ buttons). Works for banks, accounts and categories.
 export async function swapOrder(table, first, second) {
   const results = await Promise.all([
     supabase.from(table).update({ sort_order: second.sort_order }).eq('id', first.id),
@@ -99,4 +99,47 @@ export async function setBankBalance(accountId, amount) {
     .update({ bank_balance: amount, balance_checked_at: new Date().toISOString() })
     .eq('id', accountId)
   if (error) throw error
+}
+
+// ---- Step 5b: budget items (the "categories" table) ----
+
+// One account, its bank, and its budget items with balances (archived ones too).
+// Unassigned is left out: it's built in and can't be renamed or archived.
+export async function fetchAccountItems(accountId) {
+  const [account, items] = await Promise.all([
+    supabase
+      .from('accounts')
+      .select('id, name, bank:banks (id, name, currency)') // "bank:banks (...)" = also fetch its bank
+      .eq('id', accountId)
+      .single(),
+    supabase
+      .from('category_balances')
+      .select('id, name, planned_amount, sort_order, archived, balance')
+      .eq('account_id', accountId)
+      .eq('is_unassigned', false)
+      .order('sort_order')
+      .order('name'),
+  ])
+  if (account.error) throw account.error
+  if (items.error) throw items.error
+  return {
+    account: account.data,
+    items: items.data.map((i) => ({ ...i, planned_amount: Number(i.planned_amount), balance: Number(i.balance) })),
+  }
+}
+
+export async function addItem({ accountId, name, plannedAmount, sortOrder }) {
+  const { error } = await supabase.from('categories').insert({
+    account_id: accountId,
+    name: name.trim(),
+    planned_amount: plannedAmount,
+    sort_order: sortOrder,
+  })
+  if (error) throw friendly(error, `This account already has a budget item called “${name.trim()}”.`)
+}
+
+// Rename, change the plan, archive or restore one budget item.
+export async function updateItem(id, changes) {
+  const { error } = await supabase.from('categories').update(changes).eq('id', id)
+  if (error) throw friendly(error, 'This account already has a budget item with that name.')
 }

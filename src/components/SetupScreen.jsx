@@ -6,7 +6,7 @@ import { fetchBudget } from '../api/budget.js'
 import { formatMoney, parseBalance, shortDate } from '../lib/money.js'
 
 // Setup: your banks and the accounts inside them.
-// (Budget items get their own setup in Step 5b.)
+// Each account's budget items are on their own screen (AccountItemsScreen).
 export default function SetupScreen() {
   const [banks, setBanks] = useState(null) // null = loading
   const [totals, setTotals] = useState({}) // account id → what DollarHome holds there
@@ -288,6 +288,9 @@ function AccountRow({ account, currency, total, busy, run, onUp, onDown, onUpdat
         </span>
       </div>
       <div className="row-actions">
+        <Link to={`/setup/accounts/${account.id}`} className="small-button">
+          Budget items →
+        </Link>
         <button type="button" className="small-button" disabled={busy} onClick={onUpdateBalance}>
           Update balance
         </button>

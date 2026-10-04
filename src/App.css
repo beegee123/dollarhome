@@ -433,3 +433,7 @@ button.budget-row:focus-visible { outline: 3px solid var(--accent); outline-offs
 .add-form { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px dashed #bdbdb5; border-radius: 14px; }
 .add-form .section-title { margin: 0; }
 .archived { display: flex; flex-direction: column; }
+
+/* ---- Step 5b: budget items setup ---- */
+.field--plan { flex: 0 0 110px; }
+.primary-link { display: inline-flex; align-items: center; text-decoration: none; }
