@@ -964,3 +964,6 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 
 /* Any long word or number in a card wraps rather than overflowing */
 .card, .bank-card, .account-section, .sheet { overflow-wrap: anywhere; }
+
+/* ---- Step 15: move a budget item ---- */
+.move-item { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }

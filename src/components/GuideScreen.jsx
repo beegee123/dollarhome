@@ -223,6 +223,10 @@ export default function GuideScreen() {
             <li>Undo appears for 6 seconds after most actions. A past spend can be deleted from the item’s Recent list.</li>
             <li>Archive hides banks, accounts and items without losing history; only empty ones can be archived.</li>
             <li>
+              Item in the wrong account? Setup → the account → tap the item → Move to another account. It brings its money
+              and history; then move the money in your bank app.
+            </li>
+            <li>
               Setup → Reset: Restart balances (keep setup, clear activity), Delete one bank, or Delete everything.
             </li>
             <li>Sign out is at the bottom of Setup.</li>

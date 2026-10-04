@@ -30,6 +30,7 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 7. `007_targets.sql` — budget item targets: monthly, or save up to an amount by a date
 8. `008_owed.sql` — Owed: loans and tax bills (`debts`), `pay_debt` / `unpay_debt`, and Delete everything now clears them too
 9. `009_credit_cards.sql` — credit cards: account kind, payment envelopes, `add_card`, `card_spend`, `pay_card`
+10. `010_move_item.sql` — `move_category`: move a budget item (with its money and history) to another account
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
-import { addItem, fetchAccountItems, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
+import { addItem, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
 import { formatMoney, monthYear, parseBalance, shortDate, targetPace } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -20,6 +20,7 @@ export default function AccountItemsScreen() {
   const [editingId, setEditingId] = useState(null) // which item is open for editing
   const [balanceOpen, setBalanceOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const [notice, setNotice] = useState(null) // e.g. "Moved Groceries to Savings — move $160 in your bank app" 
   const [reloadCount, setReloadCount] = useState(0)
   const reload = () => setReloadCount((n) => n + 1)
 
@@ -145,6 +146,14 @@ export default function AccountItemsScreen() {
           {actionError}
         </p>
       )}
+      {notice && (
+        <div className="reminder" role="status">
+          <span>{notice}</span>
+          <button type="button" className="small-button" onClick={() => setNotice(null)}>
+            Done ✓
+          </button>
+        </div>
+      )}
 
       {isCard && (
         <p className="hint card-note">
@@ -194,6 +203,33 @@ export default function AccountItemsScreen() {
                   <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => archiveItem(item)}>
                     Archive
                   </button>
+                  <MoveItem
+                    item={item}
+                    account={account}
+                    currency={currency}
+                    busy={busy}
+                    onMove={async (toId) => {
+                      let result = null
+                      const ok = await run(async () => {
+                        result = await moveItem(item.id, toId)
+                      })
+                      if (!ok || !result) return
+                      setEditingId(null)
+                      const amount = Number(result.balance)
+                      const parts = [`Moved ${item.name} to ${result.to_account}.`]
+                      if (amount !== 0) {
+                        parts.push(
+                          `It brought ${formatMoney(amount, currency)} with it — move ${formatMoney(Math.abs(amount), currency)} from ${
+                            amount > 0 ? result.from_account : result.to_account
+                          } to ${amount > 0 ? result.to_account : result.from_account} in your bank app, then update both balances.`,
+                        )
+                      }
+                      if (result.removed_from_splits?.length) {
+                        parts.push(`It was taken out of these paycheck splits: ${result.removed_from_splits.join(', ')}.`)
+                      }
+                      setNotice(parts.join(' '))
+                    }}
+                  />
                 </>
               }
             />
@@ -412,5 +448,73 @@ function ItemForm({ currency, initial, submitLabel, busy, onSubmit, onCancel, cl
       </div>
       {extra && <div className="row-actions edit-strip">{extra}</div>}
     </form>
+  )
+}
+
+// "Move to another account": pick a bank account in the same currency.
+// The item always brings its money and history along.
+function MoveItem({ item, account, currency, busy, onMove }) {
+  const [open, setOpen] = useState(false)
+  const [targets, setTargets] = useState(null)
+  const [toId, setToId] = useState('')
+
+  useEffect(() => {
+    if (!open || targets) return
+    fetchSetup()
+      .then((banks) =>
+        setTargets(
+          banks
+            .filter((b) => !b.archived && b.currency === currency)
+            .flatMap((b) =>
+              b.accounts
+                .filter((a) => !a.archived && a.kind !== 'credit' && a.id !== account.id)
+                .map((a) => ({ id: a.id, label: `${b.name} · ${a.name}`, otherBank: b.id !== account.bank_id })),
+            ),
+        ),
+      )
+      .catch(() => setTargets([]))
+  }, [open, targets, currency, account.id, account.bank_id])
+
+  if (!open) {
+    return (
+      <button type="button" className="small-button" disabled={busy} onClick={() => setOpen(true)}>
+        Move to another account
+      </button>
+    )
+  }
+
+  const target = targets?.find((t) => t.id === toId)
+  return (
+    <div className="move-item">
+      {targets === null && <p className="muted">Loading accounts…</p>}
+      {targets?.length === 0 && <p className="muted">No other {currency} bank accounts to move it to.</p>}
+      {targets?.length > 0 && (
+        <>
+          <select className="field-select" aria-label="Move to" value={toId} onChange={(e) => setToId(e.target.value)}>
+            <option value="">Move to…</option>
+            {targets.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          {target && (
+            <p className="hint">
+              {item.name} moves with its history
+              {item.balance !== 0 && ` and its ${formatMoney(item.balance, currency)}`}. Then move that money in your bank
+              app.{target.otherBank && ' It will be taken out of this bank’s paycheck splits.'}
+            </p>
+          )}
+          <div className="inline-form">
+            <button type="button" className="small-button" disabled={busy || !toId} onClick={() => onMove(toId)}>
+              Move it
+            </button>
+            <button type="button" className="small-button" onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   )
 }

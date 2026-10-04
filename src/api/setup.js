@@ -179,3 +179,11 @@ export async function deleteBank(bankId) {
   const { error } = await supabase.rpc('delete_bank', { p_bank_id: bankId })
   if (error) throw error
 }
+
+// ---- Step 15: move a budget item to another account (it brings its money and history) ----
+// Returns { balance, from_account, to_account, removed_from_splits: [source names] }.
+export async function moveItem(itemId, toAccountId) {
+  const { data, error } = await supabase.rpc('move_category', { p_category_id: itemId, p_to_account_id: toAccountId })
+  if (error) throw error
+  return data
+}
