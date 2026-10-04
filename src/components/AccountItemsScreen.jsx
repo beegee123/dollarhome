@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
 import { addItem, fetchAccountItems, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
-import { formatMoney, parseBalance, shortDate } from '../lib/money.js'
+import { formatMoney, monthYear, parseBalance, shortDate, targetPace } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // Setup → one account. Everything about it in one place:
@@ -69,7 +69,12 @@ export default function AccountItemsScreen() {
   const currency = account.bank.currency
   const active = items.filter((i) => !i.archived)
   const archived = items.filter((i) => i.archived)
-  const totalPlan = active.reduce((sum, i) => sum + i.planned_amount, 0)
+  // Planned total per month: monthly plans, plus each dated goal's share for this month.
+  const totalPlan = active.reduce(
+    (sum, i) =>
+      sum + (i.target_type === 'by_date' && i.target_date ? targetPace(i.balance, i.planned_amount, i.target_date).perMonth : i.planned_amount),
+    0,
+  )
   const nextOrder = Math.max(-1, ...items.map((i) => i.sort_order)) + 1
   const off = Math.round((account.bank_balance - total) * 100) / 100
   const position = siblings.findIndex((s) => s.id === account.id)
@@ -141,7 +146,7 @@ export default function AccountItemsScreen() {
         <div className="bank-card-head">
           <h2>Budget items</h2>
           <span className="muted setup-row-sub">
-            Planned <span className="money">{formatMoney(totalPlan, currency)}</span>
+            Planned <span className="money">{formatMoney(totalPlan, currency)}</span> a month
           </span>
         </div>
 
@@ -152,13 +157,19 @@ export default function AccountItemsScreen() {
             <ItemForm
               key={item.id}
               currency={currency}
-              initialName={item.name}
-              initialPlan={item.planned_amount}
+              initial={item}
               submitLabel="Save"
               busy={busy}
               onCancel={() => setEditingId(null)}
-              onSubmit={async (name, plannedAmount) =>
-                (await run(() => updateItem(item.id, { name, planned_amount: plannedAmount }))) && setEditingId(null)
+              onSubmit={async (f) =>
+                (await run(() =>
+                  updateItem(item.id, {
+                    name: f.name,
+                    planned_amount: f.plannedAmount,
+                    target_type: f.targetType,
+                    target_date: f.targetType === 'by_date' ? f.targetDate : null,
+                  }),
+                )) && setEditingId(null)
               }
               // Rarely-used tools live inside the editor, not on every row.
               extra={
@@ -180,8 +191,17 @@ export default function AccountItemsScreen() {
               <span className="setup-row-main">
                 <span className="setup-row-name">{item.name}</span>
                 <span className="muted setup-row-sub">
-                  Plan <span className="money">{formatMoney(item.planned_amount, currency)}</span> · holds{' '}
-                  <span className="money">{formatMoney(item.balance, currency)}</span>
+                  {item.target_type === 'by_date' && item.target_date ? (
+                    <>
+                      Goal <span className="money">{formatMoney(item.planned_amount, currency)}</span> by{' '}
+                      {monthYear(item.target_date)}
+                    </>
+                  ) : (
+                    <>
+                      Plan <span className="money">{formatMoney(item.planned_amount, currency)}</span> a month
+                    </>
+                  )}{' '}
+                  · holds <span className="money">{formatMoney(item.balance, currency)}</span>
                 </span>
               </span>
               <span className="muted edit-word">Edit</span>
@@ -192,7 +212,7 @@ export default function AccountItemsScreen() {
         <AddItem
           currency={currency}
           busy={busy}
-          onAdd={(name, plannedAmount) => run(() => addItem({ accountId, name, plannedAmount, sortOrder: nextOrder }))}
+          onAdd={(f) => run(() => addItem({ accountId, ...f, sortOrder: nextOrder }))}
         />
 
         {archived.length > 0 && (
@@ -278,23 +298,31 @@ function AddItem({ currency, busy, onAdd }) {
   return (
     <ItemForm
       currency={currency}
-      initialName=""
-      initialPlan={null}
+      initial={null}
       submitLabel="Add item"
       busy={busy}
       onCancel={() => setOpen(false)}
       // Stays open after adding, so several items can go in one after another.
-      onSubmit={(name, plannedAmount) => onAdd(name, plannedAmount)}
+      onSubmit={(f) => onAdd(f)}
       clearAfterSubmit
     />
   )
 }
 
-// Name + planned amount. Used for adding and for editing.
-function ItemForm({ currency, initialName, initialPlan, submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
-  const [name, setName] = useState(initialName)
-  const [planText, setPlanText] = useState(initialPlan === null ? '' : String(initialPlan))
+// Name + target. Used for adding and for editing.
+// Target: Monthly (aim to have this much each month) or Save up to an amount by a date.
+function ItemForm({ currency, initial, submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [planText, setPlanText] = useState(initial ? String(initial.planned_amount) : '')
+  const [targetType, setTargetType] = useState(initial?.target_type ?? 'monthly')
+  const [targetDate, setTargetDate] = useState(initial?.target_date ?? '')
   const [error, setError] = useState(null)
+  const isGoal = targetType === 'by_date'
+
+  // Live preview for a goal: "$350/mo to reach it by Jun 2027".
+  const plan = planText.trim() === '' ? 0 : parseBalance(planText)
+  const preview =
+    isGoal && targetDate && plan > 0 ? targetPace(initial?.balance ?? 0, plan, targetDate) : null
 
   return (
     <form
@@ -302,29 +330,66 @@ function ItemForm({ currency, initialName, initialPlan, submitLabel, busy, onSub
       onSubmit={async (e) => {
         e.preventDefault()
         if (!name.trim()) return
-        const plan = planText.trim() === '' ? 0 : parseBalance(planText)
         if (plan === null || plan < 0) {
-          setError('Enter the planned amount, like 600 (or leave it blank for no plan)')
+          setError(isGoal ? 'Enter the goal amount, like 3000' : 'Enter the planned amount, like 600 (or leave it blank for no plan)')
+          return
+        }
+        if (isGoal && (!targetDate || plan === 0)) {
+          setError('A goal needs an amount and a date.')
           return
         }
         setError(null)
-        const ok = await onSubmit(name.trim(), plan)
+        const ok = await onSubmit({ name: name.trim(), plannedAmount: plan, targetType, targetDate: isGoal ? targetDate : null })
         if (ok && clearAfterSubmit) {
           setName('')
           setPlanText('')
+          setTargetType('monthly')
+          setTargetDate('')
         }
       }}
     >
+      <label className="field">
+        <span>Name</span>
+        <input placeholder="e.g. Groceries" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
+      </label>
+
+      <fieldset className="segmented">
+        <legend>Target</legend>
+        <label className={!isGoal ? 'on' : ''}>
+          <input type="radio" name={`target-${initial?.id ?? 'new'}`} checked={!isGoal} onChange={() => setTargetType('monthly')} />
+          Monthly
+        </label>
+        <label className={isGoal ? 'on' : ''}>
+          <input type="radio" name={`target-${initial?.id ?? 'new'}`} checked={isGoal} onChange={() => setTargetType('by_date')} />
+          Save up by a date
+        </label>
+      </fieldset>
+
       <div className="spend-row">
         <label className="field">
-          <span>Name</span>
-          <input placeholder="e.g. Groceries" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="field field--plan">
-          <span>Plan ({currency})</span>
+          <span>{isGoal ? `Goal (${currency})` : `Each month (${currency})`}</span>
           <input inputMode="decimal" placeholder="0" value={planText} onChange={(e) => setPlanText(e.target.value)} />
         </label>
+        {isGoal && (
+          <label className="field field--date">
+            <span>By</span>
+            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+          </label>
+        )}
       </div>
+
+      <p className="hint">
+        {isGoal
+          ? preview
+            ? preview.need === 0
+              ? 'Already funded.'
+              : preview.months === 0
+                ? 'That date has passed.'
+                : `Put about ${formatMoney(preview.perMonth, currency)} a month in to reach it by ${monthYear(targetDate)}.`
+            : 'For a goal or a bill: a vacation, an emergency fund, a tax payment.'
+          : 'For everyday spending: what you aim to have in it each month.'}
+      </p>
+
       {error && <p className="notice">{error}</p>}
       <div className="inline-form">
         <button type="submit" className="small-button" disabled={busy || !name.trim()}>

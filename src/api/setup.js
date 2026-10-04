@@ -117,7 +117,7 @@ export async function fetchAccountItems(accountId) {
   const [items, siblings] = await Promise.all([
     supabase
       .from('category_balances')
-      .select('id, name, planned_amount, sort_order, archived, is_unassigned, balance')
+      .select('id, name, planned_amount, target_type, target_date, sort_order, archived, is_unassigned, balance')
       .eq('account_id', accountId)
       .order('sort_order')
       .order('name'),
@@ -142,11 +142,13 @@ export async function fetchAccountItems(accountId) {
   }
 }
 
-export async function addItem({ accountId, name, plannedAmount, sortOrder }) {
+export async function addItem({ accountId, name, plannedAmount, targetType = 'monthly', targetDate = null, sortOrder }) {
   const { error } = await supabase.from('categories').insert({
     account_id: accountId,
     name: name.trim(),
     planned_amount: plannedAmount,
+    target_type: targetType,
+    target_date: targetType === 'by_date' ? targetDate : null,
     sort_order: sortOrder,
   })
   if (error) throw friendly(error, `This account already has a budget item called “${name.trim()}”.`)

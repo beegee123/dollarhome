@@ -78,8 +78,9 @@ export default function AnalyticsScreen() {
     .filter((r) => r.spent > 0)
     .sort((a, b) => b.spent - a.spent)
   const totalSpent = spendRows.reduce((s, r) => s + r.spent, 0)
-  const scaleMax = Math.max(1, ...spendRows.map((r) => Math.max(r.spent, r.is_unassigned ? 0 : r.planned_amount)))
-  const overCount = spendRows.filter((r) => !r.is_unassigned && r.planned_amount > 0 && r.spent > r.planned_amount).length
+  const monthlyPlan = (r) => (!r.is_unassigned && r.target_type !== 'by_date' ? r.planned_amount : 0)
+  const scaleMax = Math.max(1, ...spendRows.map((r) => Math.max(r.spent, monthlyPlan(r))))
+  const overCount = spendRows.filter((r) => monthlyPlan(r) > 0 && r.spent > monthlyPlan(r)).length
 
   // ---- Income by source this month ----
   const incomeBy = {}
@@ -175,7 +176,7 @@ export default function AnalyticsScreen() {
                 : `No spending logged at ${bank.name} in ${monthLabel(month)}.`}
             </p>
             {spendRows.map((r) => {
-              const hasPlan = !r.is_unassigned && r.planned_amount > 0
+              const hasPlan = monthlyPlan(r) > 0
               const over = hasPlan && r.spent > r.planned_amount
               const label = `${r.is_unassigned ? 'Unassigned' : r.name}: ${money(r.spent)} spent${hasPlan ? ` of ${money(r.planned_amount)} plan` : ''}${
                 over ? `, over by ${money(r.spent - r.planned_amount)}` : ''

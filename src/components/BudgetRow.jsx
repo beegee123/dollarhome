@@ -3,7 +3,8 @@ import { formatMoney, itemStatus } from '../lib/money.js'
 // One budget item: name + status label, "balance / plan", and the bar.
 // It's a button: tapping it opens Quick spend.
 export default function BudgetRow({ item, currency, onTap }) {
-  const status = itemStatus(item.balance, item.planned_amount, currency)
+  const isGoal = item.target_type === 'by_date'
+  const status = itemStatus(item.balance, item.planned_amount, currency, { type: item.target_type, date: item.target_date })
 
   return (
     <button type="button" className="budget-row" onClick={onTap}>
@@ -14,7 +15,11 @@ export default function BudgetRow({ item, currency, onTap }) {
         </span>
         <span className="budget-row-amounts">
           {formatMoney(item.balance, currency)}
-          <span className="muted"> / {formatMoney(item.planned_amount, currency)}</span>
+          <span className="muted">
+            {' '}
+            / {formatMoney(item.planned_amount, currency)}
+            {isGoal ? ' goal' : ''}
+          </span>
         </span>
       </span>
       {/* The bar: an empty track with a coloured fill as wide as the percentage. */}

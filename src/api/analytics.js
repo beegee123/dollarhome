@@ -7,7 +7,7 @@ export async function fetchAnalytics(since) {
   const [banks, accounts, categories, spends, events, sources, wishes, balances] = await Promise.all([
     supabase.from('banks').select('id, name, currency, sort_order, archived').order('sort_order').order('name'),
     supabase.from('accounts').select('id, bank_id, name'),
-    supabase.from('categories').select('id, account_id, name, planned_amount, is_unassigned, archived'),
+    supabase.from('categories').select('id, account_id, name, planned_amount, target_type, is_unassigned, archived'),
     supabase.from('transactions').select('category_id, amount, occurred_on').eq('kind', 'spend').gte('occurred_on', since),
     supabase.from('income_events').select('source_id, amount, received_on').gte('received_on', since),
     supabase.from('income_sources').select('id, name, account_id'),

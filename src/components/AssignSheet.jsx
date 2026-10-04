@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { formatMoney, parseBalance } from '../lib/money.js'
+import { formatMoney, parseBalance, targetPace } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // Assign: give Unassigned money a home. One box per budget item in the account,
@@ -31,7 +31,11 @@ export default function AssignSheet({ account, currency, onSave, onClose }) {
   // Fill = what the item still needs to reach its plan, limited to what's left.
   function fill(item) {
     const already = parseBalance(values[item.id] ?? '') || 0
-    const need = Math.max(0, item.planned_amount - item.balance)
+    // Monthly item: top up to the plan. Dated goal: this month's share of what's left.
+    const need =
+      item.target_type === 'by_date' && item.target_date
+        ? targetPace(item.balance, item.planned_amount, item.target_date).perMonth
+        : Math.max(0, item.planned_amount - item.balance)
     const amount = Math.min(need, left + already)
     setValues((v) => ({ ...v, [item.id]: amount > 0 ? String(Math.round(amount * 100) / 100) : '' }))
   }
