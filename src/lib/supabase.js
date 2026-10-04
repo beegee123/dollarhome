@@ -1,6 +1,6 @@
 // One shared connection to Supabase for the whole app.
-// Money Pantry uses the SAME Supabase project as Pantry and Daily Docket:
-// sign-in is shared, but every Money Pantry table lives in its own "money"
+// DollarHome uses the SAME Supabase project as Pantry and Daily Docket:
+// sign-in is shared, but every DollarHome table lives in its own "money"
 // schema so it never collides with the other apps' tables.
 import { createClient } from '@supabase/supabase-js'
 

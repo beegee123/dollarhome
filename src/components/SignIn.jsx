@@ -22,7 +22,7 @@ export default function SignIn() {
   return (
     <div className="screen">
       <header className="screen-header">
-        <span className="eyebrow">MONEY PANTRY</span>
+        <span className="eyebrow">DOLLARHOME</span>
         <h1>Sign in</h1>
       </header>
 

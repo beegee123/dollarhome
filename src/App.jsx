@@ -37,17 +37,56 @@ export default function App() {
   if (session === undefined) return <div className="screen center-message muted">Loading…</div>
   if (session === null) return <SignIn />
 
-  // Signed in. The Budget screen arrives in Step 3; for now, prove sign-in works.
+  // Signed in. The Budget screen arrives in Step 3; for now, prove the database works.
   return (
     <div className="screen">
       <header className="screen-header">
-        <span className="eyebrow">MONEY PANTRY</span>
+        <span className="eyebrow">DOLLARHOME</span>
         <h1>Budget</h1>
       </header>
       <p className="muted">Signed in as {session.user.email}.</p>
+      <DatabaseCheck />
       <button className="secondary" onClick={() => supabase.auth.signOut()}>
         Sign out
       </button>
     </div>
+  )
+}
+
+// Step 2 check: count what's in the "money" schema. Removed when the real Budget screen arrives.
+function DatabaseCheck() {
+  const [counts, setCounts] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function load() {
+      // count: 'exact' = "also tell me how many rows there are"; limit(1) keeps the download tiny.
+      const tables = ['banks', 'accounts', 'categories', 'transactions']
+      try {
+        const results = await Promise.all(
+          tables.map((t) => supabase.from(t).select('id', { count: 'exact' }).limit(1)),
+        )
+        const failed = results.find((r) => r.error)
+        if (failed) {
+          const e = failed.error
+          // Some errors arrive without a message, so fall back to the code and HTTP status.
+          setError(e.message || `${e.code || 'error'} (HTTP ${failed.status})`)
+          return
+        }
+        setCounts(Object.fromEntries(tables.map((t, i) => [t, results[i].count])))
+      } catch (err) {
+        setError(err.message || String(err)) // e.g. no internet connection
+      }
+    }
+    load()
+  }, [])
+
+  if (error) return <p className="notice">Database problem: {error}</p>
+  if (!counts) return <p className="muted">Checking the database…</p>
+  return (
+    <p>
+      Database connected: {counts.banks} banks, {counts.accounts} accounts,{' '}
+      {counts.categories} budget items, {counts.transactions} transactions.
+    </p>
   )
 }
