@@ -86,10 +86,10 @@ export default function SetupScreen() {
         </span>
         <span aria-hidden="true">›</span>
       </Link>
-      <Link to="/guide" className="setup-link">
+      <Link to="/owed" className="setup-link">
         <span>
-          <strong>Guide</strong>
-          <span className="muted"> · how DollarHome works</span>
+          <strong>Owed</strong>
+          <span className="muted"> · loans and tax bills</span>
         </span>
         <span aria-hidden="true">›</span>
       </Link>

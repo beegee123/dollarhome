@@ -123,8 +123,8 @@ export default function OwedScreen() {
   return (
     <div className="screen">
       <header className="screen-header screen-header--sub">
-        <Link to="/" className="back-link">
-          ← Budget
+        <Link to="/setup" className="back-link">
+          ← Setup
         </Link>
         <span className="eyebrow">DOLLARHOME</span>
         <h1>Owed</h1>

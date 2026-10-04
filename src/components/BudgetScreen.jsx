@@ -253,14 +253,14 @@ export default function BudgetScreen() {
           <Link to="/wishlist" className="small-button">
             Wishlist
           </Link>
-          <Link to="/owed" className="small-button">
-            Owed
-          </Link>
           <Link to="/analytics" className="small-button">
             Analytics
           </Link>
           <Link to="/setup" className="small-button">
             Setup
+          </Link>
+          <Link to="/guide" className="small-button help-button" aria-label="Guide">
+            ?
           </Link>
         </div>
       </header>

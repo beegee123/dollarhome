@@ -6,8 +6,8 @@ export default function GuideScreen() {
   return (
     <div className="screen">
       <header className="screen-header screen-header--sub">
-        <Link to="/setup" className="back-link">
-          ← Setup
+        <Link to="/" className="back-link">
+          ← Budget
         </Link>
         <span className="eyebrow">DOLLARHOME</span>
         <h1>Guide</h1>
@@ -168,7 +168,10 @@ export default function GuideScreen() {
 
         <Section title="Owed: loans and tax bills">
           <ul>
-            <li>Add a loan or tax bill with the envelope it’s paid from, the amount owed, and an optional due date.</li>
+            <li>
+              Setup → Owed. Add a loan or tax bill with the envelope it’s paid from, the amount owed, and an optional due
+              date.
+            </li>
             <li>Pay records a spend from the envelope and lowers what’s owed.</li>
             <li>Update owed is for interest or a new statement; it moves no money.</li>
             <li>Tip: give a tax bill’s envelope a Save up by a date target with the same amount and date.</li>

@@ -931,3 +931,10 @@ details > summary {
 .guide-dl { margin: 4px 0; }
 .guide-dl dt { margin-top: 8px; font-weight: 600; }
 .guide-dl dd { margin: 2px 0 0; }
+
+/* ? button (same as Pantry) and Pantry-style +/– on Guide sections */
+.help-button { min-width: 36px; font-weight: 600; }
+.guide-section > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; }
+.guide-section > summary::-webkit-details-marker { display: none; }
+.guide-section > summary::after { content: '+'; color: var(--muted); font-weight: 400; font-size: 18px; }
+.guide-section[open] > summary::after { content: '–'; }
