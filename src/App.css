@@ -1,0 +1,38 @@
+/* ---- Colours and fonts, used everywhere ----
+   Defined once here so the whole app can be re-themed in one place. */
+:root {
+  --bg: #f4f4f1;        /* page background */
+  --card: #ffffff;      /* rows and panels */
+  --ink: #1c1c1a;       /* main text */
+  --muted: #5a5a55;     /* secondary text */
+  --line: #ddddd6;      /* borders */
+  --accent: #2f5d50;    /* buttons, full bars, "Matches" */
+  --accent-soft: #e3ede9;
+  --low: #b86a00;       /* "Low" and over-plan */
+  --empty: #a3271e;     /* "Empty" and "Short" */
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace; /* money amounts line up in this font */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One phone-width column, centred on bigger screens. */
+.screen {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.screen-header { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
+.screen-header h1 { margin: 0; font-size: 26px; font-weight: 600; }
+
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); }
+.muted { color: var(--muted); }
