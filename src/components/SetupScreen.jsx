@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { addAccount, addBank, fetchSetup, swapOrder, updateRow } from '../api/setup.js'
+import { addAccount, addBank, deleteBank, fetchSetup, restartBalances, startFresh, swapOrder, updateRow } from '../api/setup.js'
 import { fetchBudget } from '../api/budget.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
@@ -108,6 +108,8 @@ export default function SetupScreen() {
         ))}
 
         <AddBankForm busy={busy} onAdd={(name, currency) => run(() => addBank({ name, currency, sortOrder: nextOrder(banks) }))} />
+
+        <ResetSection banks={banks} busy={busy} run={run} />
 
         {archived.length > 0 && (
           <details className="archived">
@@ -378,5 +380,86 @@ function AddAccountForm({ bank, busy, onAdd }) {
         </button>
       </div>
     </form>
+  )
+}
+
+// Reset: three levels, from gentlest to strongest. Each one asks you to type a word,
+// because none of them can be undone.
+function ResetSection({ banks, busy, run }) {
+  const [bankId, setBankId] = useState('')
+  return (
+    <details className="settings danger-zone">
+      <summary>Reset</summary>
+
+      <ResetOption
+        title="Restart balances, keep my setup"
+        word="RESTART"
+        busy={busy}
+        onConfirm={() => run(() => restartBalances())}
+        button="Restart balances"
+      >
+        Clears every spend, paycheck, move and transfer. Keeps your banks, accounts, budget items, plans, income
+        sources, splits and wishlist. Each account starts again from its bank balance on file, in Unassigned, ready
+        to assign. Update bank balances first if they’re out of date.
+      </ResetOption>
+
+      <ResetOption
+        title="Delete one bank"
+        word="DELETE"
+        busy={busy}
+        disabled={!bankId}
+        onConfirm={async () => (await run(() => deleteBank(bankId))) && setBankId('')}
+        button="Delete this bank"
+        extra={
+          <select aria-label="Bank to delete" className="field-select" value={bankId} onChange={(e) => setBankId(e.target.value)}>
+            <option value="">Choose a bank…</option>
+            {banks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.currency}){b.archived ? ' · archived' : ''}
+              </option>
+            ))}
+          </select>
+        }
+      >
+        Removes the bank with its accounts, budget items and their history, and any income sources that land there.
+        Other banks are not affected. To just hide a bank, use Archive instead.
+      </ResetOption>
+
+      <ResetOption
+        title="Delete everything"
+        word="DELETE"
+        busy={busy}
+        onConfirm={() => run(() => startFresh())}
+        button="Delete everything"
+      >
+        Deletes all your DollarHome banks, accounts, budget items, income sources, transactions and wishlist. Pantry
+        and Daily Docket are not touched.
+      </ResetOption>
+    </details>
+  )
+}
+
+function ResetOption({ title, word, busy, disabled, onConfirm, button, extra, children }) {
+  const [typed, setTyped] = useState('')
+  return (
+    <div className="reset-option">
+      <h3>{title}</h3>
+      <p className="hint">{children} This can’t be undone.</p>
+      {extra}
+      <form
+        className="inline-form"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (typed !== word || disabled) return
+          await onConfirm()
+          setTyped('')
+        }}
+      >
+        <input aria-label={`Type ${word} to confirm`} placeholder={`Type ${word}`} value={typed} onChange={(e) => setTyped(e.target.value)} />
+        <button type="submit" className="small-button small-button--danger" disabled={busy || disabled || typed !== word}>
+          {button}
+        </button>
+      </form>
+    </div>
   )
 }

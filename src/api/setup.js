@@ -157,3 +157,34 @@ export async function updateItem(id, changes) {
   const { error } = await supabase.from('categories').update(changes).eq('id', id)
   if (error) throw friendly(error, 'This account already has a budget item with that name.')
 }
+
+// ---- Step 11: first launch ----
+
+// How many income sources and wishlist items exist (for the setup checklist).
+export async function fetchSetupCounts() {
+  const [sources, wishes] = await Promise.all([
+    supabase.from('income_sources').select('id', { count: 'exact' }).eq('archived', false).limit(1),
+    supabase.from('wishlist_items').select('id', { count: 'exact' }).limit(1),
+  ])
+  if (sources.error) throw sources.error
+  if (wishes.error) throw wishes.error
+  return { sources: sources.count ?? 0, wishes: wishes.count ?? 0 }
+}
+
+// Delete ALL of your DollarHome data (database function; your rows only).
+export async function startFresh() {
+  const { error } = await supabase.rpc('start_fresh')
+  if (error) throw error
+}
+
+// Keep the setup, clear all activity, start each account again from its bank balance.
+export async function restartBalances() {
+  const { error } = await supabase.rpc('restart_balances')
+  if (error) throw error
+}
+
+// Delete one bank and everything under it.
+export async function deleteBank(bankId) {
+  const { error } = await supabase.rpc('delete_bank', { p_bank_id: bankId })
+  if (error) throw error
+}

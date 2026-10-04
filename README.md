@@ -25,6 +25,8 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 2. `002_save_income_source.sql` — `save_income_source` function: saves an income source and its split lines in one transaction
 3. `003_apply_income.sql` — `apply_income` function: applies a paycheck (income, leftover to Unassigned, transfers) in one transaction
 4. `004_wishlist.sql` — `mark_bought` and `unbuy` functions: wishlist items become spends from their envelopes (and back)
+5. `005_start_fresh.sql` — `start_fresh` function: deletes all of your own DollarHome data (Setup → Reset → Delete everything)
+6. `006_resets.sql` — `restart_balances` (keep the setup, clear the activity) and `delete_bank` (one bank and everything under it)
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

@@ -5,6 +5,7 @@ import BalanceSheet from './BalanceSheet.jsx'
 import IncomeIn from './IncomeIn.jsx'
 import AssignSheet from './AssignSheet.jsx'
 import MoveSheet from './MoveSheet.jsx'
+import SetupChecklist from './SetupChecklist.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
@@ -226,6 +227,8 @@ export default function BudgetScreen() {
           </button>
         </div>
       </header>
+
+      <SetupChecklist banks={banks} onAssign={(account, bank) => setAssignFor({ account, currency: bank.currency })} />
 
       {banks.length === 0 ? (
         <p className="empty">

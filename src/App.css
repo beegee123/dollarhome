@@ -749,3 +749,37 @@ details > summary {
 .month-income { margin: 0 0 12px; font-size: 15px; }
 .recent-right { display: inline-flex; align-items: center; gap: 4px; }
 .recent-delete { min-height: 32px; font-size: 13px; color: var(--empty); }
+
+/* ---- Step 11: setup checklist and Start fresh ---- */
+.checklist {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  background: var(--card);
+}
+.checklist-head { display: flex; justify-content: space-between; align-items: baseline; }
+.checklist-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.checklist .hint { margin: 4px 0 8px; }
+.checklist ol { margin: 0 0 4px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.checklist li { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 15px; }
+.checklist li a, .checklist-action { color: var(--accent); font-weight: 600; text-align: left; padding: 0; min-height: 40px; font-size: 15px; }
+.checklist-mark {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #8a8a82;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+.checklist-done { color: var(--muted); }
+.checklist-done span:last-child { text-decoration: line-through; }
+.checklist-done .checklist-mark { background: var(--accent); border-color: var(--accent); }
+.danger-zone summary { color: var(--empty); }
+.reset-option { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid #ecece6; }
+.reset-option h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
