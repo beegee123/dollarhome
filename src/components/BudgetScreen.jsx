@@ -5,14 +5,12 @@ import BalanceSheet from './BalanceSheet.jsx'
 import IncomeIn from './IncomeIn.jsx'
 import AssignSheet from './AssignSheet.jsx'
 import MoveSheet from './MoveSheet.jsx'
-import SetupChecklist from './SetupChecklist.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
 import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMoney } from '../api/transactions.js'
 import { setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
-import { supabase } from '../lib/supabase.js'
 import { formatMoney, normalize, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -219,16 +217,14 @@ export default function BudgetScreen() {
           <Link to="/wishlist" className="small-button">
             Wishlist
           </Link>
+          <Link to="/analytics" className="small-button">
+            Analytics
+          </Link>
           <Link to="/setup" className="small-button">
             Setup
           </Link>
-          <button type="button" className="link-button" onClick={() => supabase.auth.signOut()}>
-            Sign out
-          </button>
         </div>
       </header>
-
-      <SetupChecklist banks={banks} onAssign={(account, bank) => setAssignFor({ account, currency: bank.currency })} />
 
       {banks.length === 0 ? (
         <p className="empty">

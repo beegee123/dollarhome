@@ -8,6 +8,7 @@ import AccountItemsScreen from './components/AccountItemsScreen.jsx'
 import IncomeSourcesScreen from './components/IncomeSourcesScreen.jsx'
 import IncomeSourceForm from './components/IncomeSourceForm.jsx'
 import WishlistScreen from './components/WishlistScreen.jsx'
+import AnalyticsScreen from './components/AnalyticsScreen.jsx'
 
 // App decides WHICH screen to show: setup problem, loading, sign-in, or the app itself.
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<BudgetScreen />} />
       <Route path="/wishlist" element={<WishlistScreen />} />
+      <Route path="/analytics" element={<AnalyticsScreen />} />
       <Route path="/setup" element={<SetupScreen />} />
       {/* :accountId is a placeholder — /setup/accounts/abc123 shows account abc123's budget items */}
       <Route path="/setup/accounts/:accountId" element={<AccountItemsScreen />} />

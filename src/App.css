@@ -750,36 +750,83 @@ details > summary {
 .recent-right { display: inline-flex; align-items: center; gap: 4px; }
 .recent-delete { min-height: 32px; font-size: 13px; color: var(--empty); }
 
-/* ---- Step 11: setup checklist and Start fresh ---- */
-.checklist {
-  margin-bottom: 16px;
-  padding: 14px 16px;
-  border: 2px solid var(--accent);
-  border-radius: 14px;
-  background: var(--card);
-}
-.checklist-head { display: flex; justify-content: space-between; align-items: baseline; }
-.checklist-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
-.checklist .hint { margin: 4px 0 8px; }
-.checklist ol { margin: 0 0 4px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
-.checklist li { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 15px; }
-.checklist li a, .checklist-action { color: var(--accent); font-weight: 600; text-align: left; padding: 0; min-height: 40px; font-size: 15px; }
-.checklist-mark {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #8a8a82;
-  border-radius: 50%;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-}
-.checklist-done { color: var(--muted); }
-.checklist-done span:last-child { text-decoration: line-through; }
-.checklist-done .checklist-mark { background: var(--accent); border-color: var(--accent); }
+/* ---- Step 11: setup guide and Reset ---- */
+.guide { margin: 0 0 16px; }
+.guide-steps { margin: 4px 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.45; }
 .danger-zone summary { color: var(--empty); }
 .reset-option { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid #ecece6; }
 .reset-option h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+
+/* ---- Step 12: Analytics ---- */
+.sign-out { align-self: flex-start; margin-top: 8px; }
+.analytics-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.month-picker { display: flex; align-items: center; gap: 2px; font: 600 15px var(--sans); }
+.month-picker span { min-width: 84px; text-align: center; }
+.icon-nav {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+}
+.icon-nav:disabled { color: #c4c4bc; cursor: default; }
+.analytics-banks { margin-bottom: 12px; }
+.chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #bdbdb5;
+  border-radius: 20px;
+  background: var(--card);
+  font: 500 14px var(--sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip.on { border: 2px solid var(--accent); background: var(--accent-soft); color: #1e3e35; font-weight: 600; }
+
+.analytics { display: flex; flex-direction: column; gap: 12px; }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.card h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; }
+.card-sub { margin: -8px 0 0; font-size: 13px; color: #4a4a45; }
+
+.spend-bar { display: flex; flex-direction: column; gap: 5px; }
+.spend-bar-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
+.spend-bar-name { font-weight: 500; }
+.spend-bar-nums { font-size: 13px; white-space: nowrap; }
+.over-text { color: #8a5000; }
+.spend-track { position: relative; height: 12px; border-radius: 6px; background: #ecece6; }
+.spend-fill { position: absolute; left: 0; top: 0; height: 12px; border-radius: 6px; background: var(--accent); }
+.spend-fill--over { background: var(--low); }
+/* The plan marker: a dark tick standing above and below the track. */
+.plan-tick { position: absolute; top: -3px; width: 3px; height: 18px; margin-left: -1.5px; border-radius: 1px; background: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #4a4a45; }
+.legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-tick { display: inline-block; width: 3px; height: 14px; background: var(--ink); }
+.legend-swatch { display: inline-block; width: 14px; height: 8px; border-radius: 4px; background: var(--accent); }
+.legend-swatch--over { background: var(--low); }
+
+.income-row { display: flex; justify-content: space-between; align-items: center; min-height: 36px; border-bottom: 1px solid #ecece6; font-size: 14px; }
+.income-count { font-size: 12px; }
+
+.trend-axis { stroke: #cfcfc8; stroke-width: 1; }
+.trend-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.trend-dot--partial { fill: var(--card); stroke: var(--accent); stroke-width: 2; } /* hollow = month not finished */
+.trend-hit { fill: transparent; cursor: pointer; }
+.trend-month { font: 500 11px var(--sans); fill: var(--muted); }
+.trend-value { font: 600 12px var(--mono); fill: var(--ink); }
+
+.covered { font-size: 12px; font-weight: 600; color: var(--accent); }
+.to-go { font-size: 12px; }

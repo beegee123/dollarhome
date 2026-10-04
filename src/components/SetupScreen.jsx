@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { supabase } from '../lib/supabase.js'
 import { addAccount, addBank, deleteBank, fetchSetup, restartBalances, startFresh, swapOrder, updateRow } from '../api/setup.js'
 import { fetchBudget } from '../api/budget.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
@@ -87,6 +88,8 @@ export default function SetupScreen() {
 
       <p className="muted setup-intro">Banks are the tabs on Budget; accounts are the sections. Tap an account to manage it.</p>
 
+      <SetupGuide />
+
       {actionError && (
         <p className="notice" role="alert">
           {actionError}
@@ -110,6 +113,10 @@ export default function SetupScreen() {
         <AddBankForm busy={busy} onAdd={(name, currency) => run(() => addBank({ name, currency, sortOrder: nextOrder(banks) }))} />
 
         <ResetSection banks={banks} busy={busy} run={run} />
+
+        <button type="button" className="secondary sign-out" onClick={() => supabase.auth.signOut()}>
+          Sign out
+        </button>
 
         {archived.length > 0 && (
           <details className="archived">
@@ -461,5 +468,41 @@ function ResetOption({ title, word, busy, disabled, onConfirm, button, extra, ch
         </button>
       </form>
     </div>
+  )
+}
+
+// A read-only note: the day-one setup steps. Folded away until you open it.
+function SetupGuide() {
+  return (
+    <details className="settings guide">
+      <summary>How to set up DollarHome</summary>
+      <ol className="guide-steps">
+        <li>
+          <strong>Add your banks</strong> below, each with its currency (USD or CAD).
+        </li>
+        <li>
+          <strong>Add accounts</strong> under each bank with today’s balance from your bank app. It goes into the
+          account’s Unassigned.
+        </li>
+        <li>
+          <strong>Add budget items</strong> (Rent, Groceries…) to each account, with a planned amount. Tap the
+          account, then + Add budget item.
+        </li>
+        <li>
+          <strong>Assign your starting money:</strong> on Budget, tap Assign on the Unassigned row and give each dollar
+          a home.
+        </li>
+        <li>
+          <strong>Set up income sources</strong> (Income sources, above): where each paycheck lands and how it splits.
+        </li>
+        <li>
+          <strong>Add wishlist items</strong> if you like, each linked to an envelope.
+        </li>
+      </ol>
+      <p className="hint">
+        Tip: start with one bank and one account, use it for a week, then add the rest. After that, it’s just Income
+        in on payday and a tap on an item when you spend.
+      </p>
+    </details>
   )
 }

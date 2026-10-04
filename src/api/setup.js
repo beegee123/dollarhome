@@ -160,17 +160,6 @@ export async function updateItem(id, changes) {
 
 // ---- Step 11: first launch ----
 
-// How many income sources and wishlist items exist (for the setup checklist).
-export async function fetchSetupCounts() {
-  const [sources, wishes] = await Promise.all([
-    supabase.from('income_sources').select('id', { count: 'exact' }).eq('archived', false).limit(1),
-    supabase.from('wishlist_items').select('id', { count: 'exact' }).limit(1),
-  ])
-  if (sources.error) throw sources.error
-  if (wishes.error) throw wishes.error
-  return { sources: sources.count ?? 0, wishes: wishes.count ?? 0 }
-}
-
 // Delete ALL of your DollarHome data (database function; your rows only).
 export async function startFresh() {
   const { error } = await supabase.rpc('start_fresh')
