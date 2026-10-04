@@ -914,3 +914,20 @@ details > summary {
 }
 .card-note { margin: -4px 0 16px; }
 [hidden] { display: none !important; }
+
+/* ---- In-app Guide ---- */
+.setup-link + .setup-link { margin-top: -8px; }
+.guide-lead { margin: -4px 0 16px; font-size: 15px; line-height: 1.5; color: #3a3a36; }
+.guide-list { display: flex; flex-direction: column; gap: 8px; }
+.guide-section { padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.guide-section > summary { min-height: 52px; font: 600 15px var(--sans); color: var(--ink); }
+.guide-body { padding: 0 0 14px; font-size: 14px; line-height: 1.5; }
+.guide-body p { margin: 8px 0; }
+.guide-body ul, .guide-body ol { margin: 8px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.guide-table { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: 13px; }
+.guide-table th { text-align: left; font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line); }
+.guide-table td { padding: 7px 6px 7px 0; border-bottom: 1px solid #ecece6; vertical-align: top; }
+.guide-table td.tag-ok, .guide-table td.tag-low, .guide-table td.tag-empty { font-weight: 600; white-space: nowrap; }
+.guide-dl { margin: 4px 0; }
+.guide-dl dt { margin-top: 8px; font-weight: 600; }
+.guide-dl dd { margin: 2px 0 0; }
