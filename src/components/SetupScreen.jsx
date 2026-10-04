@@ -82,6 +82,14 @@ export default function SetupScreen() {
         Banks are the tabs on your Budget screen. Accounts are the sections inside each tab.
       </p>
 
+      <Link to="/setup/income" className="setup-link">
+        <span>
+          <strong>Income sources</strong>
+          <span className="muted"> · paychecks, payouts and their splits</span>
+        </span>
+        <span aria-hidden="true">→</span>
+      </Link>
+
       {actionError && (
         <p className="notice" role="alert">
           {actionError}

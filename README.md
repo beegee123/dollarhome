@@ -22,6 +22,7 @@ Same stack as the Pantry app.
 Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 
 1. `001_money_core.sql` — the `money` schema: banks, accounts, categories (budget items), income sources, split lines, income events, transactions, wishlist items, the `category_balances` view and row-level security
+2. `002_save_income_source.sql` — `save_income_source` function: saves an income source and its split lines in one transaction
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

@@ -437,3 +437,91 @@ button.budget-row:focus-visible { outline: 3px solid var(--accent); outline-offs
 /* ---- Step 5b: budget items setup ---- */
 .field--plan { flex: 0 0 110px; }
 .primary-link { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* ---- Step 6: income sources and splits ---- */
+.setup-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 52px;
+  margin-bottom: 16px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+}
+.setup-link:hover { border-color: var(--ink); }
+
+.source-form { display: flex; flex-direction: column; gap: 14px; }
+.source-form select {
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid #cfcfc8;
+  border-radius: 10px;
+  background: #fafaf7;
+  font: 400 16px var(--sans);
+  color: var(--ink);
+}
+
+/* Fixed amounts | Percentages */
+.segmented { display: flex; gap: 0; margin: 0; padding: 0; border: 0; }
+.segmented legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.segmented label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid #bdbdb5;
+  background: var(--card);
+  font: 500 14px var(--sans);
+  cursor: pointer;
+}
+.segmented label:first-of-type { border-radius: 10px 0 0 10px; }
+.segmented label:last-of-type { border-radius: 0 10px 10px 0; border-left: 0; }
+.segmented label.on { background: var(--accent-soft); border-color: var(--accent); color: #1e3e35; font-weight: 600; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; } /* the label is the button */
+.segmented label:focus-within { outline: 3px solid var(--accent); outline-offset: 1px; }
+
+.split-group {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.split-group .section-title { margin: 0 0 4px; }
+.split-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  border-top: 1px solid #ecece6;
+}
+.split-group .section-title + .split-line { border-top: 0; }
+.split-plan { font-size: 12px; }
+.split-input { display: flex; align-items: center; gap: 4px; }
+.split-input input {
+  width: 92px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #cfcfc8;
+  border-radius: 8px;
+  background: #fafaf7;
+  font: 500 16px var(--mono);
+  text-align: right;
+  color: var(--ink);
+}
+.split-total { margin: 0; font: 600 15px var(--sans); }
+.segmented label { position: relative; } /* keeps the hidden radio inside its label */
