@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router'
 import { supabase, missingConfig } from './lib/supabase.js'
 import SignIn from './components/SignIn.jsx'
 import BudgetScreen from './components/BudgetScreen.jsx'
+import SetupScreen from './components/SetupScreen.jsx'
 
 // App decides WHICH screen to show: setup problem, loading, sign-in, or the app itself.
 export default function App() {
@@ -38,5 +40,13 @@ export default function App() {
   if (session === undefined) return <div className="screen center-message muted">Loading…</div>
   if (session === null) return <SignIn />
 
-  return <BudgetScreen />
+  // Signed in: pick the screen from the address bar.
+  return (
+    <Routes>
+      <Route path="/" element={<BudgetScreen />} />
+      <Route path="/setup" element={<SetupScreen />} />
+      {/* Any unknown address goes back to the Budget. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }

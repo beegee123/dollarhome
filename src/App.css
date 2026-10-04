@@ -326,3 +326,110 @@ button.budget-row:focus-visible { outline: 3px solid var(--accent); outline-offs
 }
 /* Inside the row button these are <span>s, so give them block layout. */
 .bar, .bar-fill { display: block; }
+
+/* ---- Step 5a: Setup screen and Update bank balance ---- */
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.small-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #cfcfc8;
+  border-radius: 8px;
+  background: var(--card);
+  font: 500 13px var(--sans);
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.small-button:hover:not(:disabled) { border-color: var(--ink); }
+.small-button:disabled { opacity: 0.45; cursor: default; }
+.small-button--danger:hover:not(:disabled) { border-color: var(--empty); color: var(--empty); }
+.icon-button { min-width: 36px; padding: 0; }
+
+.screen-header--sub { gap: 2px; }
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 4px;
+  font-size: 15px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--ink); }
+
+/* The match check on Budget is a button now. */
+.match-button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.match-edit { font-weight: 500; color: var(--muted); text-decoration: underline; }
+
+.hint { margin: 0; font-size: 13px; color: var(--muted); }
+
+.setup-intro { margin: -4px 0 16px; font-size: 14px; }
+.setup-list { display: flex; flex-direction: column; gap: 16px; }
+.bank-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.bank-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.bank-card-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.currency-badge {
+  margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  font: 600 11px var(--mono);
+  color: var(--accent);
+  vertical-align: middle;
+}
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.setup-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid #ecece6;
+}
+.setup-row-main { display: flex; flex-direction: column; gap: 2px; }
+.setup-row-name { font-weight: 500; }
+.setup-row-sub { font-size: 13px; }
+.setup-row--archived { color: var(--muted); }
+
+.inline-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 1; }
+.inline-form input,
+.inline-form select {
+  flex: 1;
+  min-width: 140px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #cfcfc8;
+  border-radius: 8px;
+  background: #fafaf7;
+  font: 400 16px var(--sans);
+  color: var(--ink);
+}
+.inline-form select { flex: 0 0 auto; min-width: 0; }
+
+.add-link { align-self: flex-start; color: var(--accent); font-weight: 600; }
+.add-account { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid #ecece6; }
+.add-form { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px dashed #bdbdb5; border-radius: 14px; }
+.add-form .section-title { margin: 0; }
+.archived { display: flex; flex-direction: column; }

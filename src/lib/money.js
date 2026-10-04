@@ -59,3 +59,11 @@ export function shortDate(isoDate) {
   const [, m, d] = isoDate.split('-').map(Number)
   return `${months[m - 1]} ${d}`
 }
+
+// Like parseAmount, but zero and negatives are allowed (a bank balance can be $0,
+// or below zero on an overdrawn account). Returns null if it isn't a number.
+export function parseBalance(text) {
+  const cleaned = String(text).replace(/[$,\s]/g, '').replace(/^C\$/i, '').replace('−', '-')
+  if (!/^-?\d*\.?\d{0,2}$/.test(cleaned) || cleaned === '' || cleaned === '-' || cleaned === '.') return null
+  return Number(cleaned)
+}

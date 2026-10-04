@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import BudgetRow from './BudgetRow.jsx'
+import BalanceSheet from './BalanceSheet.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
 import { deleteTransaction, logSpend } from '../api/transactions.js'
+import { setBankBalance } from '../api/setup.js'
 import { supabase } from '../lib/supabase.js'
 import { formatMoney, normalize } from '../lib/money.js'
 
@@ -16,6 +19,7 @@ export default function BudgetScreen() {
   const [reloadCount, setReloadCount] = useState(0) // bump to load again
   const [spending, setSpending] = useState(null) // { item, currency } while Quick spend is open
   const [toast, setToast] = useState(null) // { text, undo } after a spend is logged
+  const [balanceFor, setBalanceFor] = useState(null) // { account, currency } while Update balance is open
   const toastTimer = useRef(null)
 
   // Load everything; again whenever reloadCount changes.
@@ -128,15 +132,19 @@ export default function BudgetScreen() {
           <span className="eyebrow">DOLLARHOME</span>
           <h1>Budget</h1>
         </div>
-        <button type="button" className="link-button" onClick={() => supabase.auth.signOut()}>
-          Sign out
-        </button>
+        <div className="header-actions">
+          <Link to="/setup" className="small-button">
+            Setup
+          </Link>
+          <button type="button" className="link-button" onClick={() => supabase.auth.signOut()}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       {banks.length === 0 ? (
         <p className="empty">
-          No banks yet. Setting up banks and accounts comes in Step 5 — for now, load the sample data
-          (<code>supabase/dev_sample_data.sql</code>).
+          No banks yet. <Link to="/setup">Go to Setup</Link> to add your first bank and account.
         </p>
       ) : (
         <>
@@ -182,6 +190,7 @@ export default function BudgetScreen() {
                 items={items}
                 searching={!!search}
                 onTapItem={(item) => setSpending({ item, currency: b.currency })}
+                onUpdateBalance={() => setBalanceFor({ account, currency: b.currency })}
               />
             ))}
           </main>
@@ -194,6 +203,19 @@ export default function BudgetScreen() {
           currency={spending.currency}
           onSave={saveSpend}
           onClose={() => setSpending(null)}
+        />
+      )}
+
+      {balanceFor && (
+        <BalanceSheet
+          account={balanceFor.account}
+          currency={balanceFor.currency}
+          onClose={() => setBalanceFor(null)}
+          onSave={async (amount) => {
+            await setBankBalance(balanceFor.account.id, amount)
+            setBalanceFor(null)
+            setReloadCount((n) => n + 1)
+          }}
         />
       )}
 
@@ -212,7 +234,7 @@ export default function BudgetScreen() {
 }
 
 // One account: its title, the match check against the bank, Unassigned, then its budget items.
-function AccountSection({ bank, account, title, items, searching, onTapItem }) {
+function AccountSection({ bank, account, title, items, searching, onTapItem, onUpdateBalance }) {
   const off = Math.round((account.bank_balance - account.total) * 100) / 100 // round away float dust
   const unassigned = account.unassigned?.balance ?? 0
 
@@ -220,11 +242,18 @@ function AccountSection({ bank, account, title, items, searching, onTapItem }) {
     <section className="account-section" aria-label={title}>
       <h2 className="section-title section-title--split">
         <span>{title}</span>
-        {off === 0 ? (
-          <span className="match match-ok">Matches bank {formatMoney(account.bank_balance, bank.currency)}</span>
-        ) : (
-          <span className="match match-off">Off by {formatMoney(Math.abs(off), bank.currency)} vs bank</span>
-        )}
+        {/* Tapping the match check opens "Update bank balance". */}
+        <button
+          type="button"
+          className={`match match-button ${off === 0 ? 'match-ok' : 'match-off'}`}
+          onClick={onUpdateBalance}
+          aria-label={`Update bank balance for ${account.name}`}
+        >
+          {off === 0
+            ? `Matches bank ${formatMoney(account.bank_balance, bank.currency)}`
+            : `Off by ${formatMoney(Math.abs(off), bank.currency)} vs bank`}
+          <span className="match-edit">Update</span>
+        </button>
       </h2>
 
       {/* Unassigned only shows when it holds money (and not in search results). */}
