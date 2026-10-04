@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
-import { addItem, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
+import { addItem, adjustToBank, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
 import { formatMoney, monthYear, parseBalance, shortDate, targetPace } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -324,6 +324,11 @@ export default function AccountItemsScreen() {
           onClose={() => setBalanceOpen(false)}
           onSave={async (amount) => {
             await setBankBalance(account.id, amount)
+            setBalanceOpen(false)
+            reload()
+          }}
+          onAdjust={async (amount, change) => {
+            await adjustToBank(account.id, amount, change)
             setBalanceOpen(false)
             reload()
           }}

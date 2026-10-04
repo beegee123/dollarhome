@@ -6,8 +6,9 @@ import { formatMoney, parseBalance } from '../lib/money.js'
 //   account   — { name, bank_balance, total } (total = what DollarHome holds, Unassigned included)
 //   currency  — 'USD' or 'CAD'
 //   onSave    — async function(amount); throws if saving failed
+//   onAdjust  — async function(amount, change): save AND add `change` to Unassigned (optional)
 //   onClose   — function
-export default function BalanceSheet({ account, currency, onSave, onClose }) {
+export default function BalanceSheet({ account, currency, onSave, onAdjust, onClose }) {
   // For a credit card the numbers are what's OWED: the statement vs what DollarHome says the card owes.
   const isCard = account.kind === 'credit'
   const held = isCard ? (account.owed ?? -account.total) : account.total
@@ -29,6 +30,25 @@ export default function BalanceSheet({ account, currency, onSave, onClose }) {
 
   const amount = parseBalance(text)
   const diff = amount === null ? null : Math.round((amount - held) * 100) / 100
+
+  // What to add to Unassigned so DollarHome matches. For a card, owing MORE means its
+  // ledger goes further below zero, so the change is the other way round.
+  const change = diff === null ? 0 : isCard ? -diff : diff
+
+  async function handleAdjust() {
+    if (amount === null) {
+      setError('Enter the balance, like 1865.40')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await onAdjust(amount, change)
+    } catch {
+      setError('Couldn’t save. Check your connection and try again.')
+      setBusy(false)
+    }
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -94,12 +114,30 @@ export default function BalanceSheet({ account, currency, onSave, onClose }) {
 
           {error && <p className="notice" role="alert">{error}</p>}
 
+          {/* When they disagree and you know DollarHome is the one that's wrong (old sample
+              numbers, a restart, something never logged), adjust Unassigned to match. */}
+          {onAdjust && diff !== null && diff !== 0 && (
+            <div className="adjust-box">
+              <p className="hint">
+                Know the bank is right? Adjust {isCard ? 'what DollarHome says the card owes' : 'Unassigned'} by{' '}
+                <strong>
+                  {change > 0 ? '+' : '−'}
+                  {formatMoney(Math.abs(change), currency)}
+                </strong>{' '}
+                so they match. Logging the missing spend or income instead keeps your history more accurate.
+              </p>
+              <button type="button" className="secondary adjust-button" disabled={busy} onClick={handleAdjust}>
+                Save and adjust to match
+              </button>
+            </div>
+          )}
+
           <div className="sheet-actions">
             <button type="button" className="secondary" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="primary" disabled={busy}>
-              {busy ? 'Saving…' : 'Save balance'}
+              {busy ? 'Saving…' : 'Save balance only'}
             </button>
           </div>
         </form>

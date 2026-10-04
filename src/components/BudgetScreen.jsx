@@ -11,7 +11,7 @@ import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
 import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMoney } from '../api/transactions.js'
-import { setBankBalance } from '../api/setup.js'
+import { adjustToBank, setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { cardSpend, payCard } from '../api/cards.js'
 import { formatMoney, normalize, todayLocal } from '../lib/money.js'
@@ -391,6 +391,11 @@ export default function BudgetScreen() {
           onClose={() => setBalanceFor(null)}
           onSave={async (amount) => {
             await setBankBalance(balanceFor.account.id, amount)
+            setBalanceFor(null)
+            setReloadCount((n) => n + 1)
+          }}
+          onAdjust={async (amount, change) => {
+            await adjustToBank(balanceFor.account.id, amount, change)
             setBalanceFor(null)
             setReloadCount((n) => n + 1)
           }}

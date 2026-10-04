@@ -107,7 +107,11 @@ export default function GuideScreen() {
               <span className="match-off">Off by $X vs bank</span>.
             </li>
             <li>Tap it and type what your bank app shows. Less in the bank usually means an unlogged spend; more, unlogged income.</li>
-            <li>Updating the bank balance never moves money between items.</li>
+            <li>Save balance only records the bank’s number; it never moves money between items.</li>
+            <li>
+              Know the bank is right (old sample numbers, a restart)? Use <strong>Save and adjust to match</strong>: the
+              difference goes into Unassigned so the account matches.
+            </li>
             <li>Credit cards have the same check against the card statement.</li>
           </ul>
         </Section>

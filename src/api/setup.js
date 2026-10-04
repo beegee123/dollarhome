@@ -187,3 +187,29 @@ export async function moveItem(itemId, toAccountId) {
   if (error) throw error
   return data
 }
+
+// Bring DollarHome into line with the bank: record the bank's number AND add the
+// difference to the account's Unassigned as an adjustment.
+//   change — how much to add to Unassigned (negative takes money out)
+// For a credit card the Unassigned is the card's ledger (minus what it owes),
+// so the screen passes the change already turned the right way round.
+export async function adjustToBank(accountId, bankBalance, change) {
+  const { data: unassigned, error: findError } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('account_id', accountId)
+    .eq('is_unassigned', true)
+    .single()
+  if (findError) throw findError
+
+  if (Math.round(change * 100) !== 0) {
+    const { error } = await supabase.from('transactions').insert({
+      category_id: unassigned.id,
+      amount: Math.round(change * 100) / 100,
+      kind: 'opening', // an adjustment, like a starting balance: not income, not spending
+      note: 'Adjusted to match bank',
+    })
+    if (error) throw error
+  }
+  await setBankBalance(accountId, bankBalance)
+}

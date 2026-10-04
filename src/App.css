@@ -967,3 +967,7 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 
 /* ---- Step 15: move a budget item ---- */
 .move-item { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+
+/* Update balance: "Save and adjust to match" */
+.adjust-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: #f4f4f1; }
+.adjust-button { margin-top: 0; }
