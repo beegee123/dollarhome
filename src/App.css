@@ -119,7 +119,7 @@ body {
 .bank-tabs {
   display: flex;
   gap: 4px;
-  margin: 0 -4px 12px;
+  margin: 0 0 12px;
   border-bottom: 1px solid var(--line);
   overflow-x: auto; /* many banks scroll sideways instead of wrapping */
 }
@@ -938,3 +938,29 @@ details > summary {
 .guide-section > summary::-webkit-details-marker { display: none; }
 .guide-section > summary::after { content: '+'; color: var(--muted); font-weight: 400; font-size: 18px; }
 .guide-section[open] > summary::after { content: '–'; }
+
+/* ---- No sideways scrolling on a phone ----
+   Rows that held long text on one line could push the page wider than the
+   screen. They now wrap instead, and the page itself never scrolls sideways. */
+html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps sticky/fixed parts working */
+.screen { width: 100%; }
+
+/* Account header: name on the left, match check wraps under it if there's no room */
+.section-title--split { flex-wrap: wrap; row-gap: 2px; }
+.match { white-space: normal; text-align: left; }
+
+/* Budget item rows: long names wrap; amounts drop to the next line if needed */
+.budget-row-top { flex-wrap: wrap; row-gap: 2px; }
+.budget-row-name { min-width: 0; overflow-wrap: anywhere; }
+
+/* Analytics, Wishlist, Owed rows */
+.spend-bar-top { flex-wrap: wrap; row-gap: 2px; }
+.spend-bar-name { min-width: 0; overflow-wrap: anywhere; }
+.wish-env-status { white-space: normal; }
+.setup-row-main { min-width: 0; overflow-wrap: anywhere; }
+
+/* Guide tables fit the screen */
+.guide-table td.tag-ok, .guide-table td.tag-low, .guide-table td.tag-empty { white-space: normal; }
+
+/* Any long word or number in a card wraps rather than overflowing */
+.card, .bank-card, .account-section, .sheet { overflow-wrap: anywhere; }
