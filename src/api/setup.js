@@ -103,28 +103,42 @@ export async function setBankBalance(accountId, amount) {
 
 // ---- Step 5b: budget items (the "categories" table) ----
 
-// One account, its bank, and its budget items with balances (archived ones too).
-// Unassigned is left out: it's built in and can't be renamed or archived.
+// One account (with its bank and its sibling accounts, for reordering) and its budget
+// items with balances, archived ones too. Unassigned is returned separately: it's
+// built in and can't be renamed or archived, but it counts toward the account's total.
 export async function fetchAccountItems(accountId) {
-  const [account, items] = await Promise.all([
-    supabase
-      .from('accounts')
-      .select('id, name, bank:banks (id, name, currency)') // "bank:banks (...)" = also fetch its bank
-      .eq('id', accountId)
-      .single(),
+  const { data: account, error } = await supabase
+    .from('accounts')
+    .select('id, bank_id, name, bank_balance, balance_checked_at, sort_order, archived, bank:banks (id, name, currency)')
+    .eq('id', accountId)
+    .single()
+  if (error) throw error
+
+  const [items, siblings] = await Promise.all([
     supabase
       .from('category_balances')
-      .select('id, name, planned_amount, sort_order, archived, balance')
+      .select('id, name, planned_amount, sort_order, archived, is_unassigned, balance')
       .eq('account_id', accountId)
-      .eq('is_unassigned', false)
+      .order('sort_order')
+      .order('name'),
+    supabase
+      .from('accounts')
+      .select('id, sort_order')
+      .eq('bank_id', account.bank_id)
+      .eq('archived', false)
       .order('sort_order')
       .order('name'),
   ])
-  if (account.error) throw account.error
   if (items.error) throw items.error
+  if (siblings.error) throw siblings.error
+
+  const all = items.data.map((i) => ({ ...i, planned_amount: Number(i.planned_amount), balance: Number(i.balance) }))
   return {
-    account: account.data,
-    items: items.data.map((i) => ({ ...i, planned_amount: Number(i.planned_amount), balance: Number(i.balance) })),
+    account: { ...account, bank_balance: Number(account.bank_balance) },
+    unassigned: all.find((i) => i.is_unassigned)?.balance ?? 0,
+    total: all.reduce((sum, i) => sum + i.balance, 0), // everything DollarHome holds here
+    items: all.filter((i) => !i.is_unassigned),
+    siblings: siblings.data,
   }
 }
 

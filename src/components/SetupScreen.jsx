@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import BalanceSheet from './BalanceSheet.jsx'
-import { addAccount, addBank, fetchSetup, setBankBalance, swapOrder, updateRow } from '../api/setup.js'
+import { addAccount, addBank, fetchSetup, swapOrder, updateRow } from '../api/setup.js'
 import { fetchBudget } from '../api/budget.js'
-import { formatMoney, parseBalance, shortDate } from '../lib/money.js'
+import { formatMoney, parseBalance } from '../lib/money.js'
 
 // Setup: your banks and the accounts inside them.
-// Each account's budget items are on their own screen (AccountItemsScreen).
+// Kept short on purpose: each account is one row; tap it for everything else
+// (balance, budget items, rename, order, archive) on the account's own screen.
 export default function SetupScreen() {
   const [banks, setBanks] = useState(null) // null = loading
   const [totals, setTotals] = useState({}) // account id → what DollarHome holds there
@@ -15,11 +15,9 @@ export default function SetupScreen() {
   const [busy, setBusy] = useState(false)
   const [reloadCount, setReloadCount] = useState(0)
   const reload = () => setReloadCount((n) => n + 1)
-  const [balanceFor, setBalanceFor] = useState(null) // { account, currency } while the balance sheet is open
 
   useEffect(() => {
     let ignore = false
-    // fetchBudget gives each account's total (sum of its items), for the balance sheet.
     Promise.all([fetchSetup(), fetchBudget()])
       .then(([setup, budget]) => {
         if (ignore) return
@@ -78,17 +76,15 @@ export default function SetupScreen() {
         <h1>Setup</h1>
       </header>
 
-      <p className="muted setup-intro">
-        Banks are the tabs on your Budget screen. Accounts are the sections inside each tab.
-      </p>
-
       <Link to="/setup/income" className="setup-link">
         <span>
           <strong>Income sources</strong>
           <span className="muted"> · paychecks, payouts and their splits</span>
         </span>
-        <span aria-hidden="true">→</span>
+        <span aria-hidden="true">›</span>
       </Link>
+
+      <p className="muted setup-intro">Banks are the tabs on Budget; accounts are the sections. Tap an account to manage it.</p>
 
       {actionError && (
         <p className="notice" role="alert">
@@ -107,15 +103,14 @@ export default function SetupScreen() {
             nextOrder={nextOrder}
             onUp={index > 0 ? () => run(() => swapOrder('banks', bank, active[index - 1])) : null}
             onDown={index < active.length - 1 ? () => run(() => swapOrder('banks', bank, active[index + 1])) : null}
-            onUpdateBalance={(account) => setBalanceFor({ account: { ...account, total: totals[account.id] ?? 0 }, currency: bank.currency })}
           />
         ))}
 
         <AddBankForm busy={busy} onAdd={(name, currency) => run(() => addBank({ name, currency, sortOrder: nextOrder(banks) }))} />
 
         {archived.length > 0 && (
-          <section className="archived">
-            <h2 className="section-title">Archived banks</h2>
+          <details className="archived">
+            <summary>Archived banks ({archived.length})</summary>
             {archived.map((bank) => (
               <div key={bank.id} className="setup-row setup-row--archived">
                 <span>
@@ -126,36 +121,26 @@ export default function SetupScreen() {
                 </button>
               </div>
             ))}
-          </section>
+          </details>
         )}
       </main>
-
-      {balanceFor && (
-        <BalanceSheet
-          account={balanceFor.account}
-          currency={balanceFor.currency}
-          onClose={() => setBalanceFor(null)}
-          onSave={async (amount) => {
-            await setBankBalance(balanceFor.account.id, amount)
-            setBalanceFor(null)
-            reload()
-          }}
-        />
-      )}
     </div>
   )
 }
 
-// One bank: its name and currency, its controls, and its accounts.
-function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown, onUpdateBalance }) {
+// One bank: a header with a single Edit button, then one row per account.
+function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown }) {
+  const [editing, setEditing] = useState(false) // Edit opens rename / order / archive
   const [renaming, setRenaming] = useState(false)
-  const [blocked, setBlocked] = useState(null) // why something can't be archived yet
+  const [blocked, setBlocked] = useState(null)
   const activeAccounts = bank.accounts.filter((a) => !a.archived)
   const archivedAccounts = bank.accounts.filter((a) => a.archived)
 
   // A bank can only be archived when none of its accounts hold money.
   function archiveBank() {
-    const withMoney = activeAccounts.filter((a) => moneyIn(a, totals[a.id]))
+    const withMoney = activeAccounts.filter(
+      (a) => Math.round((totals[a.id] ?? 0) * 100) !== 0 || a.bank_balance !== 0,
+    )
     if (withMoney.length > 0) {
       setBlocked(
         `${bank.name} can’t be archived while ${withMoney.map((a) => a.name).join(' and ')} still ${
@@ -167,19 +152,6 @@ function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown, onUpdateBa
     setBlocked(null)
     if (window.confirm(`Archive ${bank.name}? Its tab disappears from Budget. You can restore it later.`)) {
       run(() => updateRow('banks', bank.id, { archived: true }))
-    }
-  }
-
-  // An account can only be archived when it's empty in DollarHome AND at the bank.
-  function archiveAccount(account) {
-    const reason = moneyIn(account, totals[account.id])
-    if (reason) {
-      setBlocked(`${account.name} can’t be archived yet: ${reason}. Move or spend it first, then archive.`)
-      return
-    }
-    setBlocked(null)
-    if (window.confirm(`Archive ${account.name}? Its section disappears from Budget. You can restore it later.`)) {
-      run(() => updateRow('accounts', account.id, { archived: true }))
     }
   }
 
@@ -199,23 +171,38 @@ function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown, onUpdateBa
             <h2>
               {bank.name} <span className="currency-badge">{bank.currency}</span>
             </h2>
-            <div className="row-actions">
-              <OrderButtons onUp={onUp} onDown={onDown} busy={busy} label={bank.name} />
-              <button type="button" className="small-button" disabled={busy} onClick={() => setRenaming(true)}>
-                Rename
-              </button>
-              <button
-                type="button"
-                className="small-button small-button--danger"
-                disabled={busy}
-                onClick={archiveBank}
-              >
-                Archive
-              </button>
-            </div>
+            <button
+              type="button"
+              className="link-button"
+              aria-expanded={editing}
+              onClick={() => {
+                setEditing((e) => !e)
+                setBlocked(null)
+              }}
+            >
+              {editing ? 'Done' : 'Edit'}
+            </button>
           </>
         )}
       </div>
+
+      {/* Bank tools: only while editing. */}
+      {editing && !renaming && (
+        <div className="row-actions edit-strip">
+          <button type="button" className="small-button" disabled={busy} onClick={() => setRenaming(true)}>
+            Rename
+          </button>
+          <button type="button" className="small-button" disabled={busy || !onUp} onClick={onUp ?? undefined}>
+            Move up
+          </button>
+          <button type="button" className="small-button" disabled={busy || !onDown} onClick={onDown ?? undefined}>
+            Move down
+          </button>
+          <button type="button" className="small-button small-button--danger" disabled={busy} onClick={archiveBank}>
+            Archive
+          </button>
+        </div>
+      )}
 
       {blocked && (
         <p className="notice" role="alert">
@@ -225,22 +212,28 @@ function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown, onUpdateBa
 
       {activeAccounts.length === 0 && <p className="muted empty--small">No accounts yet.</p>}
 
-      {activeAccounts.map((account, index) => (
-        <AccountRow
-          key={account.id}
-          account={account}
-          currency={bank.currency}
-          total={totals[account.id] ?? 0}
-          busy={busy}
-          run={run}
-          onUp={index > 0 ? () => run(() => swapOrder('accounts', account, activeAccounts[index - 1])) : null}
-          onDown={
-            index < activeAccounts.length - 1 ? () => run(() => swapOrder('accounts', account, activeAccounts[index + 1])) : null
-          }
-          onUpdateBalance={() => onUpdateBalance(account)}
-          onArchive={() => archiveAccount(account)}
-        />
-      ))}
+      {/* One compact, tappable row per account. */}
+      {activeAccounts.map((account) => {
+        const off = Math.round((account.bank_balance - (totals[account.id] ?? 0)) * 100) / 100
+        return (
+          <Link key={account.id} to={`/setup/accounts/${account.id}`} className="account-link">
+            <span className="setup-row-main">
+              <span className="setup-row-name">{account.name}</span>
+              <span className="muted setup-row-sub">
+                Bank <span className="money">{formatMoney(account.bank_balance, bank.currency)}</span>
+                {off === 0 ? (
+                  <span className="match-ok"> · matches</span>
+                ) : (
+                  <span className="match-off"> · off by {formatMoney(Math.abs(off), bank.currency)}</span>
+                )}
+              </span>
+            </span>
+            <span className="chevron" aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        )
+      })}
 
       <AddAccountForm
         bank={bank}
@@ -250,100 +243,25 @@ function BankCard({ bank, totals, busy, run, nextOrder, onUp, onDown, onUpdateBa
         }
       />
 
-      {archivedAccounts.map((account) => (
-        <div key={account.id} className="setup-row setup-row--archived">
-          <span>
-            {account.name} <span className="muted">· archived</span>
-          </span>
-          <button type="button" className="small-button" disabled={busy} onClick={() => run(() => updateRow('accounts', account.id, { archived: false }))}>
-            Restore
-          </button>
-        </div>
-      ))}
+      {archivedAccounts.length > 0 && (
+        <details className="archived">
+          <summary>Archived accounts ({archivedAccounts.length})</summary>
+          {archivedAccounts.map((account) => (
+            <div key={account.id} className="setup-row setup-row--archived">
+              <span>{account.name}</span>
+              <button type="button" className="small-button" disabled={busy} onClick={() => run(() => updateRow('accounts', account.id, { archived: false }))}>
+                Restore
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
     </section>
   )
 }
 
-// One account: name, what the bank says (and when you last checked), and its controls.
-function AccountRow({ account, currency, total, busy, run, onUp, onDown, onUpdateBalance, onArchive }) {
-  const [renaming, setRenaming] = useState(false)
-  const off = Math.round((account.bank_balance - total) * 100) / 100
-  const checked = account.balance_checked_at
-    ? `checked ${shortDate(account.balance_checked_at.slice(0, 10))}`
-    : 'not checked yet'
-
-  if (renaming) {
-    return (
-      <div className="setup-row">
-        <NameForm
-          initial={account.name}
-          label="Account name"
-          busy={busy}
-          onCancel={() => setRenaming(false)}
-          onSave={async (name) => (await run(() => updateRow('accounts', account.id, { name }))) && setRenaming(false)}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="setup-row setup-row--account">
-      <div className="setup-row-main">
-        <span className="setup-row-name">{account.name}</span>
-        <span className="muted setup-row-sub">
-          Bank says <span className="money">{formatMoney(account.bank_balance, currency)}</span> · {checked}
-          {off !== 0 && <span className="match-off"> · off by {formatMoney(Math.abs(off), currency)}</span>}
-        </span>
-      </div>
-      <div className="row-actions">
-        <Link to={`/setup/accounts/${account.id}`} className="small-button">
-          Budget items →
-        </Link>
-        <button type="button" className="small-button" disabled={busy} onClick={onUpdateBalance}>
-          Update balance
-        </button>
-        <OrderButtons onUp={onUp} onDown={onDown} busy={busy} label={account.name} />
-        <button type="button" className="small-button" disabled={busy} onClick={() => setRenaming(true)}>
-          Rename
-        </button>
-        <button
-          type="button"
-          className="small-button small-button--danger"
-          disabled={busy}
-          onClick={onArchive}
-        >
-          Archive
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// Does this account still hold money? Returns the reason as words, or null if it's empty.
-// Both must be zero: what DollarHome holds (its budget items + Unassigned) and what the bank says.
-function moneyIn(account, total = 0) {
-  const held = Math.round(total * 100) / 100
-  if (held !== 0) return 'its budget items still hold money in DollarHome'
-  if (account.bank_balance !== 0) return 'the bank still shows a balance (update it to 0 once the account is empty)'
-  return null
-}
-
-// ↑ / ↓ buttons. A missing handler means "already at the top/bottom".
-function OrderButtons({ onUp, onDown, busy, label }) {
-  return (
-    <>
-      <button type="button" className="small-button icon-button" aria-label={`Move ${label} up`} disabled={busy || !onUp} onClick={onUp ?? undefined}>
-        ↑
-      </button>
-      <button type="button" className="small-button icon-button" aria-label={`Move ${label} down`} disabled={busy || !onDown} onClick={onDown ?? undefined}>
-        ↓
-      </button>
-    </>
-  )
-}
-
-// A one-field form for renaming.
-function NameForm({ initial, label, busy, onSave, onCancel }) {
+// A one-field form for renaming. Also used on the account screen.
+export function NameForm({ initial, label, busy, onSave, onCancel }) {
   const [name, setName] = useState(initial)
   return (
     <form
@@ -365,25 +283,41 @@ function NameForm({ initial, label, busy, onSave, onCancel }) {
 }
 
 function AddBankForm({ busy, onAdd }) {
+  const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('USD')
+
+  if (!open) {
+    return (
+      <button type="button" className="link-button add-link" onClick={() => setOpen(true)}>
+        + Add a bank
+      </button>
+    )
+  }
+
   return (
     <form
       className="add-form"
       onSubmit={async (e) => {
         e.preventDefault()
-        if (name.trim() && (await onAdd(name.trim(), currency))) setName('')
+        if (name.trim() && (await onAdd(name.trim(), currency))) {
+          setName('')
+          setOpen(false)
+        }
       }}
     >
       <h2 className="section-title">Add a bank</h2>
       <div className="inline-form">
-        <input aria-label="New bank name" placeholder="e.g. Chase" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
+        <input aria-label="New bank name" placeholder="e.g. Chase" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
         <select aria-label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
           <option value="USD">USD</option>
           <option value="CAD">CAD</option>
         </select>
         <button type="submit" className="small-button" disabled={busy || !name.trim()}>
           Add
+        </button>
+        <button type="button" className="small-button" onClick={() => setOpen(false)}>
+          Cancel
         </button>
       </div>
       <p className="hint">The currency can’t be changed later, so every amount at this bank stays in one currency.</p>
@@ -400,7 +334,7 @@ function AddAccountForm({ bank, busy, onAdd }) {
   if (!open) {
     return (
       <button type="button" className="link-button add-link" onClick={() => setOpen(true)}>
-        + Add account to {bank.name}
+        + Add account
       </button>
     )
   }
