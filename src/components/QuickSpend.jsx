@@ -10,7 +10,8 @@ const KIND_LABELS = { income: 'Income', spend: 'Spent', move: 'Moved', transfer:
 //   currency  — 'USD' or 'CAD'
 //   onSave    — async function({ amount, note, occurredOn }); throws if saving failed
 //   onClose   — function, closes the panel
-export default function QuickSpend({ item, currency, onSave, onClose }) {
+//   onMove    — function, switches to Move money starting from this item
+export default function QuickSpend({ item, currency, onSave, onClose, onMove }) {
   const [amountText, setAmountText] = useState('')
   const [note, setNote] = useState('')
   const [occurredOn, setOccurredOn] = useState(todayLocal())
@@ -123,6 +124,11 @@ export default function QuickSpend({ item, currency, onSave, onClose }) {
               {busy ? 'Saving…' : 'Log spend'}
             </button>
           </div>
+          {onMove && (
+            <button type="button" className="link-button add-link" onClick={onMove}>
+              Move money from {item.name} instead →
+            </button>
+          )}
         </form>
 
         <div className="recent">

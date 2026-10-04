@@ -3,14 +3,16 @@ import { Link } from 'react-router'
 import BudgetRow from './BudgetRow.jsx'
 import BalanceSheet from './BalanceSheet.jsx'
 import IncomeIn from './IncomeIn.jsx'
+import AssignSheet from './AssignSheet.jsx'
+import MoveSheet from './MoveSheet.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
-import { deleteTransaction, logSpend } from '../api/transactions.js'
+import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMoney } from '../api/transactions.js'
 import { setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { supabase } from '../lib/supabase.js'
-import { formatMoney, normalize } from '../lib/money.js'
+import { formatMoney, normalize, todayLocal } from '../lib/money.js'
 
 // The home screen: bank tabs → account sections → budget items.
 export default function BudgetScreen() {
@@ -23,6 +25,8 @@ export default function BudgetScreen() {
   const [toast, setToast] = useState(null) // { text, undo } after a spend is logged
   const [balanceFor, setBalanceFor] = useState(null) // { account, currency } while Update balance is open
   const [incomeOpen, setIncomeOpen] = useState(false)
+  const [assignFor, setAssignFor] = useState(null) // { account, currency } while Assign is open
+  const [moveFrom, setMoveFrom] = useState(undefined) // undefined = closed; null or an item id = open
   const [reminders, setReminders] = useState([]) // "Move $400 from Truist Checking to Truist Savings" 
   const toastTimer = useRef(null)
 
@@ -121,6 +125,52 @@ export default function BudgetScreen() {
       }
       setReloadCount((n) => n + 1)
     })
+  }
+
+  // Assign: spread Unassigned across items, then reload.
+  async function saveAssign(allocations) {
+    const { account, currency } = assignFor
+    const total = allocations.reduce((sum, a) => sum + a.amount, 0)
+    const pairIds = await assignFromUnassigned({
+      unassignedId: account.unassigned.id,
+      allocations,
+      occurredOn: todayLocal(),
+    })
+    setAssignFor(null)
+    setReloadCount((n) => n + 1)
+    showToast(`Assigned ${formatMoney(total, currency)} in ${account.name}`, () => undoPairs(pairIds))
+  }
+
+  // Move or transfer between any two items, then reload.
+  async function saveMove({ from, to, sent, received, kind, note, occurredOn, needsBankStep }) {
+    const pairId = await moveMoney({ fromId: from.id, toId: to.id, sent, received, kind, note, occurredOn })
+    setMoveFrom(undefined)
+    setReloadCount((n) => n + 1)
+    if (needsBankStep) {
+      const arrived = received !== sent ? ` (${formatMoney(received, to.bank.currency)} arrives)` : ''
+      setReminders((r) => [
+        {
+          id: pairId,
+          eventId: pairId,
+          text: `Move ${formatMoney(sent, from.bank.currency)} from ${from.bank.name} ${from.account.name} to ${to.bank.name} ${to.account.name}${arrived}`,
+        },
+        ...r,
+      ])
+    }
+    showToast(`Moved ${formatMoney(sent, from.bank.currency)} from ${from.name} to ${to.name}`, () =>
+      undoPairs([pairId]),
+    )
+  }
+
+  async function undoPairs(pairIds) {
+    setToast(null)
+    try {
+      await deletePairs(pairIds)
+      setReminders((r) => r.filter((m) => !pairIds.includes(m.eventId)))
+    } catch {
+      showToast('Couldn’t undo.')
+    }
+    setReloadCount((n) => n + 1)
   }
 
   if (loadError) {
@@ -236,6 +286,7 @@ export default function BudgetScreen() {
                 searching={!!search}
                 onTapItem={(item) => setSpending({ item, currency: b.currency })}
                 onUpdateBalance={() => setBalanceFor({ account, currency: b.currency })}
+                onAssign={() => setAssignFor({ account, currency: b.currency })}
               />
             ))}
           </main>
@@ -243,12 +294,23 @@ export default function BudgetScreen() {
       )}
 
       {/* The payday button, always at the bottom of the screen. */}
-      {banks.length > 0 && !spending && !incomeOpen && !balanceFor && (
+      {banks.length > 0 && !spending && !incomeOpen && !balanceFor && !assignFor && moveFrom === undefined && (
         <div className="bottom-bar">
+          <button type="button" className="secondary bottom-bar-side" onClick={() => setMoveFrom(null)}>
+            Move
+          </button>
           <button type="button" className="primary bottom-bar-button" onClick={() => setIncomeOpen(true)}>
             + Income in
           </button>
         </div>
+      )}
+
+      {assignFor && (
+        <AssignSheet account={assignFor.account} currency={assignFor.currency} onSave={saveAssign} onClose={() => setAssignFor(null)} />
+      )}
+
+      {moveFrom !== undefined && (
+        <MoveSheet banks={banks} fromId={moveFrom} onSave={saveMove} onClose={() => setMoveFrom(undefined)} />
       )}
 
       {incomeOpen && <IncomeIn banks={banks} onApply={saveIncome} onClose={() => setIncomeOpen(false)} />}
@@ -259,6 +321,10 @@ export default function BudgetScreen() {
           currency={spending.currency}
           onSave={saveSpend}
           onClose={() => setSpending(null)}
+          onMove={() => {
+            setMoveFrom(spending.item.id)
+            setSpending(null)
+          }}
         />
       )}
 
@@ -290,7 +356,7 @@ export default function BudgetScreen() {
 }
 
 // One account: its title, the match check against the bank, Unassigned, then its budget items.
-function AccountSection({ bank, account, title, items, searching, onTapItem, onUpdateBalance }) {
+function AccountSection({ bank, account, title, items, searching, onTapItem, onUpdateBalance, onAssign }) {
   const off = Math.round((account.bank_balance - account.total) * 100) / 100 // round away float dust
   const unassigned = account.unassigned?.balance ?? 0
 
@@ -319,6 +385,11 @@ function AccountSection({ bank, account, title, items, searching, onTapItem, onU
             <span className="muted unassigned-label">Unassigned</span>
             <span className="unassigned-amount">{formatMoney(unassigned, bank.currency)}</span>
           </span>
+          {unassigned > 0 && account.items.length > 0 && (
+            <button type="button" className="small-button" onClick={onAssign}>
+              Assign
+            </button>
+          )}
         </div>
       )}
 
