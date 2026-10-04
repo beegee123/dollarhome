@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatMoney, parseAmount, todayLocal } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Move money from one budget item to another, in the SAME CURRENCY only
 // (USD with USD, CAD with CAD). Once you pick one side, the other list only
@@ -86,7 +87,7 @@ export default function MoveSheet({ banks, fromId: initialFrom, onSave, onClose 
         needsBankStep: kind !== 'move',
       })
     } catch (err) {
-      setError(err.message || 'Couldn’t save. Check your connection and try again.')
+      setError(friendlyError(err))
       setBusy(false)
     }
   }

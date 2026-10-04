@@ -98,3 +98,20 @@ export async function undoIncome(eventId) {
   const { error } = await supabase.from('income_events').delete().eq('id', eventId)
   if (error) throw error
 }
+
+// ---- Step 10: this month's income, per source ----
+// { [sourceId]: { total, count } } for paychecks received since the 1st of this month.
+export async function fetchMonthIncome() {
+  const now = new Date()
+  const first = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const { data, error } = await supabase.from('income_events').select('source_id, amount').gte('received_on', first)
+  if (error) throw error
+  const totals = {}
+  data.forEach((e) => {
+    const key = e.source_id ?? 'none'
+    totals[key] ??= { total: 0, count: 0 }
+    totals[key].total += Number(e.amount)
+    totals[key].count += 1
+  })
+  return totals
+}

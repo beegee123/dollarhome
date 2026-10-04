@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchRecent } from '../api/transactions.js'
+import { deleteTransaction, fetchRecent } from '../api/transactions.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
 
 const KIND_LABELS = { income: 'Income', spend: 'Spent', move: 'Moved', transfer: 'Transfer', opening: 'Starting balance' }
@@ -11,13 +11,15 @@ const KIND_LABELS = { income: 'Income', spend: 'Spent', move: 'Moved', transfer:
 //   onSave    — async function({ amount, note, occurredOn }); throws if saving failed
 //   onClose   — function, closes the panel
 //   onMove    — function, switches to Move money starting from this item
-export default function QuickSpend({ item, currency, onSave, onClose, onMove }) {
+//   onDeleted — function(amount), after a past spend was deleted (amount is negative)
+export default function QuickSpend({ item, currency, onSave, onClose, onMove, onDeleted }) {
   const [amountText, setAmountText] = useState('')
   const [note, setNote] = useState('')
   const [occurredOn, setOccurredOn] = useState(todayLocal())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [recent, setRecent] = useState(null)
+  const [recentError, setRecentError] = useState(null)
   const amountRef = useRef(null)
 
   // Put the cursor in the amount box right away, so you can just type.
@@ -135,14 +137,39 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove }) 
           <h3 className="section-title">Recent in {item.name}</h3>
           {recent === null && <p className="muted empty--small">Loading…</p>}
           {recent?.length === 0 && <p className="muted empty--small">Nothing yet.</p>}
+          {recentError && <p className="notice">{recentError}</p>}
           {recent?.map((t) => (
             <div key={t.id} className="recent-row">
               <span>
                 {shortDate(t.occurred_on)} · {t.note || KIND_LABELS[t.kind]}
               </span>
-              <span className={`money ${t.amount < 0 ? '' : 'money-in'}`}>
-                {t.amount > 0 ? '+' : ''}
-                {formatMoney(t.amount, currency)}
+              <span className="recent-right">
+                <span className={`money ${t.amount < 0 ? '' : 'money-in'}`}>
+                  {t.amount > 0 ? '+' : ''}
+                  {formatMoney(t.amount, currency)}
+                </span>
+                {/* Only plain spends can be deleted here. Income, moves and transfers
+                    are part of a paycheck or a pair, so they're undone where they were made. */}
+                {t.kind === 'spend' && (
+                  <button
+                    type="button"
+                    className="link-button recent-delete"
+                    aria-label={`Delete ${formatMoney(t.amount, currency)} spend`}
+                    onClick={async () => {
+                      if (!window.confirm(`Delete this ${formatMoney(-t.amount, currency)} spend? ${item.name} gets it back.`)) return
+                      setRecentError(null)
+                      try {
+                        await deleteTransaction(t.id)
+                        setRecent((rows) => rows.filter((r) => r.id !== t.id))
+                        onDeleted?.(t.amount)
+                      } catch {
+                        setRecentError('Couldn’t delete. Check your connection and try again.')
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
               </span>
             </div>
           ))}

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { fetchSources, setSourceArchived } from '../api/income.js'
+import { fetchMonthIncome, fetchSources, setSourceArchived } from '../api/income.js'
 import { formatMoney } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Setup → Income sources: the list. Tap one to edit its split.
 export default function IncomeSourcesScreen() {
   const [sources, setSources] = useState(null)
+  const [month, setMonth] = useState({}) // source id → { total, count } this month
   const [loadError, setLoadError] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -13,9 +15,14 @@ export default function IncomeSourcesScreen() {
 
   useEffect(() => {
     let ignore = false
-    fetchSources()
-      .then((s) => !ignore && (setSources(s), setLoadError(null)))
-      .catch((err) => !ignore && setLoadError(err.message))
+    Promise.all([fetchSources(), fetchMonthIncome()])
+      .then(([s, m]) => {
+        if (ignore) return
+        setSources(s)
+        setMonth(m)
+        setLoadError(null)
+      })
+      .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
       ignore = true
     }
@@ -28,7 +35,7 @@ export default function IncomeSourcesScreen() {
       await setSourceArchived(source.id, archived)
       setReloadCount((n) => n + 1)
     } catch (err) {
-      setActionError(err.message)
+      setActionError(friendlyError(err))
     } finally {
       setBusy(false)
     }
@@ -49,6 +56,19 @@ export default function IncomeSourcesScreen() {
 
   const active = sources.filter((s) => !s.archived)
   const archived = sources.filter((s) => s.archived)
+  const monthName = new Date().toLocaleString('en-US', { month: 'long' })
+
+  // This month's totals per currency (USD and CAD are never added together).
+  const monthByCurrency = {}
+  sources.forEach((s) => {
+    const m = month[s.id]
+    if (!m) return
+    const c = s.account.bank.currency
+    monthByCurrency[c] = (monthByCurrency[c] ?? 0) + m.total
+  })
+  const monthText = Object.entries(monthByCurrency)
+    .map(([c, n]) => formatMoney(n, c))
+    .join(' + ')
 
   return (
     <div className="screen">
@@ -67,6 +87,10 @@ export default function IncomeSourcesScreen() {
 
       {actionError && <p className="notice" role="alert">{actionError}</p>}
 
+      <p className="month-income">
+        Received in {monthName}: <span className="money strong">{monthText || '—'}</span>
+      </p>
+
       <main className="bank-card">
         {active.length === 0 && <p className="muted empty--small">No income sources yet.</p>}
 
@@ -82,6 +106,13 @@ export default function IncomeSourcesScreen() {
                 <span className="setup-row-name">{s.name}</span>
                 <span className="muted setup-row-sub">
                   Lands in {s.account.bank.name} · {s.account.name} · {summary}
+                </span>
+                <span className="setup-row-sub">
+                  {month[s.id]
+                    ? `${monthName}: ${formatMoney(month[s.id].total, currency)} · ${month[s.id].count} ${
+                        month[s.id].count === 1 ? 'deposit' : 'deposits'
+                      }`
+                    : `${monthName}: nothing yet`}
                 </span>
               </div>
               <div className="row-actions">

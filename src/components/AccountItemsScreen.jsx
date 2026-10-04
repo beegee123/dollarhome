@@ -4,6 +4,7 @@ import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
 import { addItem, fetchAccountItems, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
 import { formatMoney, parseBalance, shortDate } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Setup → one account. Everything about it in one place:
 //   top:    what the bank says, and Update balance
@@ -30,7 +31,7 @@ export default function AccountItemsScreen() {
         setData(d)
         setLoadError(null)
       })
-      .catch((err) => !ignore && setLoadError(err.message))
+      .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
       ignore = true
     }
@@ -44,7 +45,7 @@ export default function AccountItemsScreen() {
       reload()
       return true
     } catch (err) {
-      setActionError(err.message)
+      setActionError(friendlyError(err))
       return false
     } finally {
       setBusy(false)

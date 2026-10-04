@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { fetchSourceForm, saveSource } from '../api/income.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Add or edit one income source: its name, where it lands, and its split.
 // Address: /setup/income/new  or  /setup/income/<id>
@@ -41,7 +42,7 @@ export default function IncomeSourceForm() {
           setAccountId(banks[0]?.accounts[0]?.id ?? '')
         }
       })
-      .catch((err) => !ignore && setLoadError(err.message))
+      .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
       ignore = true
     }
@@ -113,7 +114,7 @@ export default function IncomeSourceForm() {
       await saveSource({ id: isNew ? null : sourceId, name, accountId, splitType, lines })
       navigate('/setup/income')
     } catch (err) {
-      setSaveError(err.message)
+      setSaveError(friendlyError(err))
       setBusy(false)
     }
   }

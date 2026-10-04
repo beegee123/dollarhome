@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchSources } from '../api/income.js'
 import { formatMoney, parseAmount, parseBalance, todayLocal } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Payday: pick the source, check the amount, adjust any line, Apply.
 // Props:
@@ -23,7 +24,7 @@ export default function IncomeIn({ banks, onApply, onClose }) {
     let ignore = false
     fetchSources()
       .then((all) => !ignore && setSources(all.filter((s) => !s.archived)))
-      .catch((err) => !ignore && setLoadError(err.message))
+      .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
       ignore = true
     }
@@ -106,7 +107,7 @@ export default function IncomeIn({ banks, onApply, onClose }) {
     try {
       await onApply({ source, amount, receivedOn, note, lines: toSend, transfers })
     } catch (err) {
-      setError(err.message || 'Couldn’t save. Check your connection and try again.')
+      setError(friendlyError(err))
       setBusy(false)
     }
   }

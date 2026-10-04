@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatMoney, parseBalance } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Assign: give Unassigned money a home. One box per budget item in the account,
 // with a "Fill" shortcut that tops the item up to its plan.
@@ -45,7 +46,7 @@ export default function AssignSheet({ account, currency, onSave, onClose }) {
     try {
       await onSave(allocations)
     } catch (err) {
-      setError(err.message || 'Couldn’t save. Check your connection and try again.')
+      setError(friendlyError(err))
       setBusy(false)
     }
   }

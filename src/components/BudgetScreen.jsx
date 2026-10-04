@@ -13,6 +13,7 @@ import { setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { supabase } from '../lib/supabase.js'
 import { formatMoney, normalize, todayLocal } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // The home screen: bank tabs → account sections → budget items.
 export default function BudgetScreen() {
@@ -42,7 +43,7 @@ export default function BudgetScreen() {
         setBankId((current) => (data.some((b) => b.id === current) ? current : data[0]?.id ?? null))
       })
       .catch((err) => {
-        if (!ignore) setLoadError(err.message)
+        if (!ignore) setLoadError(friendlyError(err))
       })
     return () => {
       ignore = true
@@ -278,6 +279,11 @@ export default function BudgetScreen() {
 
           <main className="account-list">
             {search && sections.length === 0 && <p className="empty">No budget items match “{query.trim()}”.</p>}
+            {!search && bank && bank.accounts.length === 0 && (
+              <p className="empty">
+                {bank.name} has no accounts yet. <Link to="/setup">Add one in Setup</Link>.
+              </p>
+            )}
 
             {sections.map(({ bank: b, account, title, items }) => (
               <AccountSection
@@ -327,6 +333,11 @@ export default function BudgetScreen() {
           onMove={() => {
             setMoveFrom(spending.item.id)
             setSpending(null)
+          }}
+          onDeleted={(amount) => {
+            // amount is negative (a spend), so subtracting it gives the money back
+            adjustBalance(spending.item.id, -amount)
+            setSpending((sp) => sp && { ...sp, item: { ...sp.item, balance: sp.item.balance - amount } })
           }}
         />
       )}

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { addAccount, addBank, fetchSetup, swapOrder, updateRow } from '../api/setup.js'
 import { fetchBudget } from '../api/budget.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Setup: your banks and the accounts inside them.
 // Kept short on purpose: each account is one row; tap it for everything else
@@ -27,7 +28,7 @@ export default function SetupScreen() {
         setTotals(t)
         setLoadError(null)
       })
-      .catch((err) => !ignore && setLoadError(err.message))
+      .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
       ignore = true
     }
@@ -42,7 +43,7 @@ export default function SetupScreen() {
       reload()
       return true
     } catch (err) {
-      setActionError(err.message)
+      setActionError(friendlyError(err))
       return false
     } finally {
       setBusy(false)

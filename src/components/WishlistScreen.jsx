@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { fetchBudget } from '../api/budget.js'
 import { addWish, deleteWish, fetchWishlist, markBought, unbuy, updateWish } from '../api/wishlist.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
+import { friendlyError } from '../lib/errors.js'
 
 // Wishlist: tap items to select them; the bottom panel checks each envelope
 // has enough, then Mark bought turns them into spends.
@@ -28,7 +29,7 @@ export default function WishlistScreen() {
         setBanks(b)
         setLoadError(null)
       })
-      .catch((err) => !ignore && setLoadError(err.message))
+      .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
       ignore = true
     }
@@ -59,7 +60,7 @@ export default function WishlistScreen() {
       reload()
       return true
     } catch (err) {
-      setActionError(err.message)
+      setActionError(friendlyError(err))
       return false
     } finally {
       setBusy(false)
