@@ -214,6 +214,9 @@ export default function BudgetScreen() {
           <h1>Budget</h1>
         </div>
         <div className="header-actions">
+          <Link to="/wishlist" className="small-button">
+            Wishlist
+          </Link>
           <Link to="/setup" className="small-button">
             Setup
           </Link>
