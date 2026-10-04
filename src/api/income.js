@@ -76,3 +76,25 @@ export async function setSourceArchived(id, archived) {
   const { error } = await supabase.from('income_sources').update({ archived }).eq('id', id)
   if (error) throw error
 }
+
+// ---- Step 7: Income in ----
+
+// Apply one paycheck: income, leftover and transfers, all saved together.
+// lines = [{ category_id, value }] in money (percentages already turned into amounts).
+export async function applyIncome({ sourceId, amount, receivedOn, note, lines }) {
+  const { data, error } = await supabase.rpc('apply_income', {
+    p_source_id: sourceId,
+    p_amount: amount,
+    p_received_on: receivedOn,
+    p_note: note ?? '',
+    p_lines: lines,
+  })
+  if (error) throw error
+  return data // the income event's id, used by Undo
+}
+
+// Undo a paycheck: deleting its income event deletes all its transactions too.
+export async function undoIncome(eventId) {
+  const { error } = await supabase.from('income_events').delete().eq('id', eventId)
+  if (error) throw error
+}

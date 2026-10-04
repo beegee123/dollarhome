@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import BudgetRow from './BudgetRow.jsx'
 import BalanceSheet from './BalanceSheet.jsx'
+import IncomeIn from './IncomeIn.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
 import { deleteTransaction, logSpend } from '../api/transactions.js'
 import { setBankBalance } from '../api/setup.js'
+import { applyIncome, undoIncome } from '../api/income.js'
 import { supabase } from '../lib/supabase.js'
 import { formatMoney, normalize } from '../lib/money.js'
 
@@ -20,6 +22,8 @@ export default function BudgetScreen() {
   const [spending, setSpending] = useState(null) // { item, currency } while Quick spend is open
   const [toast, setToast] = useState(null) // { text, undo } after a spend is logged
   const [balanceFor, setBalanceFor] = useState(null) // { account, currency } while Update balance is open
+  const [incomeOpen, setIncomeOpen] = useState(false)
+  const [reminders, setReminders] = useState([]) // "Move $400 from Truist Checking to Truist Savings" 
   const toastTimer = useRef(null)
 
   // Load everything; again whenever reloadCount changes.
@@ -89,6 +93,33 @@ export default function BudgetScreen() {
         showToast('Couldn’t undo. Reloading…')
         setReloadCount((n) => n + 1)
       }
+    })
+  }
+
+  // Apply a paycheck, then reload so every bar shows the new balances.
+  async function saveIncome({ source, amount, receivedOn, note, lines, transfers }) {
+    const currency = source.account.bank.currency
+    const eventId = await applyIncome({ sourceId: source.id, amount, receivedOn, note, lines }) // throws on failure
+    setIncomeOpen(false)
+    setBankId(source.account.bank.id) // show the bank the money went to
+    setReloadCount((n) => n + 1)
+
+    const moves = transfers.map((t) => ({
+      id: `${eventId}-${t.accountName}`,
+      eventId,
+      text: `Move ${formatMoney(t.amount, currency)} from ${source.account.bank.name} ${source.account.name} to ${source.account.bank.name} ${t.accountName}`,
+    }))
+    setReminders((r) => [...moves, ...r])
+
+    showToast(`Added ${formatMoney(amount, currency)} from ${source.name}`, async () => {
+      setToast(null)
+      try {
+        await undoIncome(eventId)
+        setReminders((r) => r.filter((m) => m.eventId !== eventId))
+      } catch {
+        showToast('Couldn’t undo.')
+      }
+      setReloadCount((n) => n + 1)
     })
   }
 
@@ -178,6 +209,20 @@ export default function BudgetScreen() {
                 )}`}
           </p>
 
+          {/* Transfers to make in your real bank after a paycheck. Tap ✓ once done. */}
+          {reminders.map((m) => (
+            <div key={m.id} className="reminder" role="status">
+              <span>{m.text}</span>
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => setReminders((r) => r.filter((x) => x.id !== m.id))}
+              >
+                Done ✓
+              </button>
+            </div>
+          ))}
+
           <main className="account-list">
             {search && sections.length === 0 && <p className="empty">No budget items match “{query.trim()}”.</p>}
 
@@ -196,6 +241,17 @@ export default function BudgetScreen() {
           </main>
         </>
       )}
+
+      {/* The payday button, always at the bottom of the screen. */}
+      {banks.length > 0 && !spending && !incomeOpen && !balanceFor && (
+        <div className="bottom-bar">
+          <button type="button" className="primary bottom-bar-button" onClick={() => setIncomeOpen(true)}>
+            + Income in
+          </button>
+        </div>
+      )}
+
+      {incomeOpen && <IncomeIn banks={banks} onApply={saveIncome} onClose={() => setIncomeOpen(false)} />}
 
       {spending && (
         <QuickSpend
