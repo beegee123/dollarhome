@@ -830,3 +830,56 @@ details > summary {
 
 .covered { font-size: 12px; font-weight: 600; color: var(--accent); }
 .to-go { font-size: 12px; }
+
+/* ---- Goal reached! ---- */
+.celebrate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(28, 28, 26, 0.5);
+  overflow: hidden;
+}
+.celebrate-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 24px 22px;
+  border-radius: 20px;
+  background: var(--card);
+  text-align: center;
+  animation: pop-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.celebrate-card h2 { margin: 8px 0 0; font-size: 24px; font-weight: 700; }
+.celebrate-name { margin: 0; font-size: 17px; font-weight: 600; color: var(--accent); }
+.celebrate-amount { margin: 0; font-size: 15px; color: #4a4a45; }
+.celebrate-early { margin: 2px 0 0; padding: 4px 10px; border-radius: 12px; background: var(--accent-soft); color: #1e3e35; font-size: 13px; font-weight: 600; }
+.celebrate-card .primary { width: 100%; margin-top: 14px; }
+
+.confetti { position: absolute; inset: 0; pointer-events: none; }
+.confetti span {
+  position: absolute;
+  top: -20px;
+  border-radius: 2px;
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes confetti-fall {
+  to { transform: translateY(110vh) rotate(calc(var(--spin) * 720deg)); opacity: 0.8; }
+}
+@keyframes pop-in { from { transform: scale(0.8); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* People who turn off motion get the card without confetti or bounce. */
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+  .celebrate-card { animation: none; }
+}

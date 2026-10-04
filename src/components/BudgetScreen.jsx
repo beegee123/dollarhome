@@ -5,6 +5,7 @@ import BalanceSheet from './BalanceSheet.jsx'
 import IncomeIn from './IncomeIn.jsx'
 import AssignSheet from './AssignSheet.jsx'
 import MoveSheet from './MoveSheet.jsx'
+import Celebration from './Celebration.jsx'
 import SearchBox from './SearchBox.jsx'
 import QuickSpend from './QuickSpend.jsx'
 import { fetchBudget } from '../api/budget.js'
@@ -29,6 +30,8 @@ export default function BudgetScreen() {
   const [moveFrom, setMoveFrom] = useState(undefined) // undefined = closed; null or an item id = open
   const [reminders, setReminders] = useState([]) // "Move $400 from Truist Checking to Truist Savings" 
   const toastTimer = useRef(null)
+  const [celebrating, setCelebrating] = useState(null) // { goal, currency } when a goal was just reached
+  const goalsFunded = useRef(null) // goal id → funded? from the previous load (null = first load)
 
   // Load everything; again whenever reloadCount changes.
   useEffect(() => {
@@ -38,6 +41,25 @@ export default function BudgetScreen() {
       .then((data) => {
         if (ignore) return
         setBanks(data)
+
+        // Did a goal just cross the line? Compare with the previous load.
+        // (The first load only remembers; it never celebrates.)
+        const now = {}
+        let reached = null
+        data.forEach((b) =>
+          b.accounts.forEach((a) =>
+            a.items.forEach((i) => {
+              if (i.target_type !== 'by_date' || !(i.planned_amount > 0)) return
+              now[i.id] = i.balance >= i.planned_amount
+              if (goalsFunded.current && goalsFunded.current[i.id] === false && now[i.id] && !reached) {
+                reached = { goal: i, currency: b.currency }
+              }
+            }),
+          ),
+        )
+        goalsFunded.current = now
+        if (reached) setCelebrating(reached)
+
         // Open the first tab, unless the open one still exists.
         setBankId((current) => (data.some((b) => b.id === current) ? current : data[0]?.id ?? null))
       })
@@ -352,6 +374,10 @@ export default function BudgetScreen() {
             setReloadCount((n) => n + 1)
           }}
         />
+      )}
+
+      {celebrating && (
+        <Celebration goal={celebrating.goal} currency={celebrating.currency} onClose={() => setCelebrating(null)} />
       )}
 
       {toast && (
