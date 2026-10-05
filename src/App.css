@@ -988,3 +988,29 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 }
 .mini-toggle button + button { border-left: 1px solid #bdbdb5; }
 .mini-toggle button.on { background: var(--accent); color: #fff; }
+
+/* Bill notes */
+.notes-box {
+  width: 100%;
+  min-height: 60vh;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  font: 400 16px/1.5 var(--sans);
+  color: var(--ink);
+  resize: vertical;
+}
+.notes-box:focus { outline: 3px solid var(--accent); outline-offset: 1px; }
+.notes-status { margin: 8px 2px 0; font-size: 13px; }
+
+/* Income split: per-account totals */
+.split-group .section-title--split .split-sum { font: 600 14px var(--mono); text-transform: none; letter-spacing: 0; color: var(--ink); }
+.account-totals { margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); display: flex; flex-direction: column; gap: 6px; }
+.account-totals h2 { margin: 0 0 2px; }
+.account-totals .row { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.account-totals .row span:last-child { font: 500 15px var(--mono); white-space: nowrap; }
+.account-totals .hint { margin: 4px 0 0; }
+.example-field { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.example-field input { width: 110px; height: 36px; padding: 0 10px; border: 1px solid #cfcfc8; border-radius: 8px; background: #fafaf7; font: 500 15px var(--mono); }

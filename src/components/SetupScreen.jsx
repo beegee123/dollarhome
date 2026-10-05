@@ -93,6 +93,13 @@ export default function SetupScreen() {
         </span>
         <span aria-hidden="true">›</span>
       </Link>
+      <Link to="/setup/notes" className="setup-link">
+        <span>
+          <strong>Bill notes</strong>
+          <span className="muted"> · one running note to jot things down</span>
+        </span>
+        <span aria-hidden="true">›</span>
+      </Link>
 
       <p className="muted setup-intro">Banks are the tabs on Budget; accounts are the sections. Tap an account to manage it.</p>
 

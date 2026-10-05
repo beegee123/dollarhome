@@ -32,6 +32,7 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 9. `009_credit_cards.sql` — credit cards: account kind, payment envelopes, `add_card`, `card_spend`, `pay_card`
 10. `010_move_item.sql` — `move_category`: move a budget item (with its money and history) to another account
 11. `011_loan_interest.sql` — loan interest: annual rate on debts, interest part of each payment
+12. `012_notes.sql` — Bill notes: one running note per person (Setup → Bill notes)
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

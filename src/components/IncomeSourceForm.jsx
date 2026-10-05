@@ -21,6 +21,7 @@ export default function IncomeSourceForm() {
   const [splitType, setSplitType] = useState('fixed')
   const [values, setValues] = useState({}) // budget item id → what's typed in its box
   const [showOthers, setShowOthers] = useState(false) // show the bank's OTHER accounts (transfers)?
+  const [example, setExample] = useState('') // percent splits: a sample payout to see dollar amounts
 
   useEffect(() => {
     let ignore = false
@@ -77,22 +78,25 @@ export default function IncomeSourceForm() {
   const landing = bank?.accounts.find((a) => a.id === accountId)
   const others = bank?.accounts.filter((a) => a.id !== accountId) ?? []
 
-  // "Transfers: $400 to Savings" — one entry per other account that has amounts typed in.
-  const transfers = others
-    .map((a) => ({
-      name: a.name,
-      amount: lines
-        .filter((l) => l.value > 0 && a.items.some((i) => i.id === l.category_id))
-        .reduce((sum, l) => sum + l.value, 0),
-    }))
-    .filter((t) => t.amount > 0)
+  // Total per account, so you know how much to move between accounts at the real bank.
+  const sumFor = (a) =>
+    lines.filter((l) => l.value > 0 && a.items.some((i) => i.id === l.category_id)).reduce((sum, l) => sum + l.value, 0)
+  const perAccount = [landing, ...others].filter(Boolean).map((a) => ({ id: a.id, name: a.name, amount: sumFor(a) }))
+  const transfers = perAccount.filter((t) => t.id !== accountId && t.amount > 0)
+  const examplePayout = splitType === 'percent' ? parseBalance(example) : null
   const showAmount = (n) => (splitType === 'fixed' ? formatMoney(n, currency) : `${Math.round(n * 100) / 100}%`)
+  // Percent splits also show dollars when a sample payout is typed in.
+  const showWithDollars = (n) =>
+    splitType === 'percent' && examplePayout > 0
+      ? `${showAmount(n)} · ${formatMoney(Math.round(examplePayout * n) / 100, currency)}`
+      : showAmount(n)
 
   function groupProps() {
     return {
       currency,
       splitType,
       values,
+      sumLabel: (a) => showWithDollars(sumFor(a)),
       onChange: (itemId, text) => setValues((v) => ({ ...v, [itemId]: text })),
     }
   }
@@ -201,10 +205,35 @@ export default function IncomeSourceForm() {
               ? `Split total: ${formatMoney(total, currency)} per paycheck`
               : `Total: ${Math.round(total * 100) / 100}%${percentOff ? ' — must be 100' : ''}`}
           </p>
-          {transfers.length > 0 && (
-            <p className="hint">
-              Transfers: {transfers.map((t) => `${showAmount(t.amount)} to ${t.name}`).join(', ')}
-            </p>
+          {splitType === 'percent' && (
+            <label className="example-field">
+              <span className="muted">See it in dollars for a payout of</span>
+              <input inputMode="decimal" placeholder="e.g. 1850" value={example} onChange={(e) => setExample(e.target.value)} />
+            </label>
+          )}
+
+          {perAccount.some((t) => t.amount > 0) && (
+            <section className="account-totals" aria-label="Total per account">
+              <h2 className="section-title">Total per account</h2>
+              {perAccount
+                .filter((t) => t.amount > 0 || t.id === accountId)
+                .map((t) => (
+                  <div key={t.id} className="row">
+                    <span>
+                      {t.name}
+                      {t.id === accountId && <span className="muted"> · stays here</span>}
+                    </span>
+                    <span>{showWithDollars(t.amount)}</span>
+                  </div>
+                ))}
+              {transfers.length > 0 && (
+                <p className="hint">
+                  At {bank.name}, move{' '}
+                  {transfers.map((t) => `${showWithDollars(t.amount)} to ${t.name}`).join(', ')} from {landing?.name}.
+                  {splitType === 'fixed' && ' Anything above the split total stays in ' + landing?.name + ' (Unassigned).'}
+                </p>
+              )}
+            </section>
           )}
 
           {saveError && <p className="notice" role="alert">{saveError}</p>}
@@ -224,10 +253,13 @@ export default function IncomeSourceForm() {
 }
 
 // One account's budget items, each with a box for its amount or percent.
-function SplitGroup({ account, title, currency, splitType, values, onChange }) {
+function SplitGroup({ account, title, currency, splitType, values, onChange, sumLabel }) {
   return (
     <section className="split-group">
-      <h2 className="section-title">{title}</h2>
+      <h2 className="section-title section-title--split">
+        <span>{title}</span>
+        <span className="split-sum">{sumLabel(account)}</span>
+      </h2>
       {account.items.length === 0 && <p className="muted empty--small">No budget items in this account.</p>}
       {account.items.map((item) => (
         <label key={item.id} className="split-line">

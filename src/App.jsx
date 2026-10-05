@@ -7,6 +7,7 @@ import SetupScreen from './components/SetupScreen.jsx'
 import AccountItemsScreen from './components/AccountItemsScreen.jsx'
 import IncomeSourcesScreen from './components/IncomeSourcesScreen.jsx'
 import IncomeSourceForm from './components/IncomeSourceForm.jsx'
+import NotesScreen from './components/NotesScreen.jsx'
 import WishlistScreen from './components/WishlistScreen.jsx'
 import AnalyticsScreen from './components/AnalyticsScreen.jsx'
 import OwedScreen from './components/OwedScreen.jsx'
@@ -59,6 +60,7 @@ export default function App() {
       {/* :accountId is a placeholder — /setup/accounts/abc123 shows account abc123's budget items */}
       <Route path="/setup/accounts/:accountId" element={<AccountItemsScreen />} />
       <Route path="/setup/income" element={<IncomeSourcesScreen />} />
+      <Route path="/setup/notes" element={<NotesScreen />} />
       {/* /setup/income/new adds one; /setup/income/<id> edits one */}
       <Route path="/setup/income/:sourceId" element={<IncomeSourceForm />} />
       {/* Any unknown address goes back to the Budget. */}
