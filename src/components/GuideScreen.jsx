@@ -95,6 +95,11 @@ export default function GuideScreen() {
             percentages that add up to 100. Any line can be changed for one paycheck.
           </p>
           <p>
+            <strong>Total per account.</strong> While editing a split, each account shows its total, and the Total per
+            account box says how much to move at your bank (e.g. “move $400 to Savings from Checking”). For a percent
+            split, type a sample payout to see it in dollars.
+          </p>
+          <p>
             <strong>Moves vs transfers.</strong> Within one account nothing changes at the bank. Between accounts you get
             a reminder to move the money in your bank app; tap Done ✓ once you have.
           </p>
@@ -236,6 +241,7 @@ export default function GuideScreen() {
             <li>
               Setup → Reset: Restart balances (keep setup, clear activity), Delete one bank, or Delete everything.
             </li>
+            <li>Setup → Bill notes is one running note for anything to remember about bills. It saves as you type.</li>
             <li>Sign out is at the bottom of Setup.</li>
           </ul>
         </Section>
