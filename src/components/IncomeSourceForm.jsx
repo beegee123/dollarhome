@@ -21,7 +21,7 @@ export default function IncomeSourceForm() {
   const [splitType, setSplitType] = useState('fixed')
   const [values, setValues] = useState({}) // budget item id → what's typed in its box
   const [showOthers, setShowOthers] = useState(false) // show the bank's OTHER accounts (transfers)?
-  const [example, setExample] = useState('') // percent splits: a sample payout to see dollar amounts
+  const [example, setExample] = useState('') // a paycheck/payout amount, just to see what's left (not saved)
 
   useEffect(() => {
     let ignore = false
@@ -83,7 +83,14 @@ export default function IncomeSourceForm() {
     lines.filter((l) => l.value > 0 && a.items.some((i) => i.id === l.category_id)).reduce((sum, l) => sum + l.value, 0)
   const perAccount = [landing, ...others].filter(Boolean).map((a) => ({ id: a.id, name: a.name, amount: sumFor(a) }))
   const transfers = perAccount.filter((t) => t.id !== accountId && t.amount > 0)
-  const examplePayout = splitType === 'percent' ? parseBalance(example) : null
+  const examplePayout = parseBalance(example)
+  // What's left to split: dollars for fixed splits (needs the paycheck amount), percent for percent splits.
+  const remaining =
+    splitType === 'percent'
+      ? Math.round((100 - total) * 100) / 100
+      : examplePayout > 0
+        ? Math.round((examplePayout - total) * 100) / 100
+        : null
   const showAmount = (n) => (splitType === 'fixed' ? formatMoney(n, currency) : `${Math.round(n * 100) / 100}%`)
   // Percent splits also show dollars when a sample payout is typed in.
   const showWithDollars = (n) =>
@@ -205,14 +212,14 @@ export default function IncomeSourceForm() {
               ? `Split total: ${formatMoney(total, currency)} per paycheck`
               : `Total: ${Math.round(total * 100) / 100}%${percentOff ? ' — must be 100' : ''}`}
           </p>
-          {splitType === 'percent' && (
-            <label className="example-field">
-              <span className="muted">See it in dollars for a payout of</span>
-              <input inputMode="decimal" placeholder="e.g. 1850" value={example} onChange={(e) => setExample(e.target.value)} />
-            </label>
-          )}
+          <label className="example-field">
+            <span className="muted">
+              {splitType === 'fixed' ? 'Paycheck amount (to see what’s left)' : 'See it in dollars for a payout of'}
+            </span>
+            <input inputMode="decimal" placeholder={splitType === 'fixed' ? 'e.g. 2400' : 'e.g. 1850'} value={example} onChange={(e) => setExample(e.target.value)} />
+          </label>
 
-          {perAccount.some((t) => t.amount > 0) && (
+          {(perAccount.some((t) => t.amount > 0) || remaining !== null) && (
             <section className="account-totals" aria-label="Total per account">
               <h2 className="section-title">Total per account</h2>
               {perAccount
@@ -226,6 +233,13 @@ export default function IncomeSourceForm() {
                     <span>{showWithDollars(t.amount)}</span>
                   </div>
                 ))}
+              {remaining !== null && (
+                <div className={`row remaining-row ${remaining < 0 ? 'match-off' : ''}`}>
+                  <span>{remaining < 0 ? 'Over by' : 'Left to allocate'}</span>
+                  <span>{showWithDollars(Math.abs(remaining))}</span>
+                </div>
+              )}
+              {remaining === null && <p className="hint">Type the paycheck amount above to see what’s left to allocate.</p>}
               {transfers.length > 0 && (
                 <p className="hint">
                   At {bank.name}, move{' '}
