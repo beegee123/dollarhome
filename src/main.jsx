@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App.jsx'
 import './App.css'
+import { stopPasswordManagerPrompts } from './lib/noAutofill.js'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -13,3 +14,5 @@ createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+stopPasswordManagerPrompts()
