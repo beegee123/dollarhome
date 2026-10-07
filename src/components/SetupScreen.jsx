@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { supabase } from '../lib/supabase.js'
-import { addAccount, addBank, deleteBank, fetchSetup, restartBalances, startFresh, swapOrder, updateRow } from '../api/setup.js'
+import { addAccount, addBank, deleteBank, deleteUnusedBank, fetchSetup, restartBalances, startFresh, swapOrder, updateRow } from '../api/setup.js'
 import { fetchBudget } from '../api/budget.js'
 import { addCard } from '../api/cards.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
@@ -161,6 +161,14 @@ function BankCard({ bank, allBanks, totals, busy, run, nextOrder, onUp, onDown }
   const activeAccounts = bank.accounts.filter((a) => !a.archived)
   const archivedAccounts = bank.accounts.filter((a) => a.archived)
 
+  // Delete is for a bank that was never used; the database says why if it can't.
+  function deleteThisBank() {
+    setBlocked(null)
+    if (window.confirm(`Delete ${bank.name} and its accounts for good? This only works if nothing was ever used in it. Otherwise archive it.`)) {
+      run(() => deleteUnusedBank(bank.id))
+    }
+  }
+
   // A bank can only be archived when none of its accounts hold money.
   function archiveBank() {
     const withMoney = activeAccounts.filter(
@@ -225,6 +233,9 @@ function BankCard({ bank, allBanks, totals, busy, run, nextOrder, onUp, onDown }
           </button>
           <button type="button" className="small-button small-button--danger" disabled={busy} onClick={archiveBank}>
             Archive
+          </button>
+          <button type="button" className="small-button small-button--danger" disabled={busy} onClick={deleteThisBank}>
+            Delete
           </button>
         </div>
       )}

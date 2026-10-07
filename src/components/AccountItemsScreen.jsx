@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
-import { addItem, adjustToBank, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
+import { addItem, adjustToBank, deleteAccount, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
 import { formatMoney, monthYear, parseBalance, shortDate, targetPace } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -105,6 +105,13 @@ export default function AccountItemsScreen() {
     }
     if (window.confirm(`Archive ${account.name}? Its section disappears from Budget. You can restore it later.`)) {
       run(() => updateRow('accounts', account.id, { archived: true })).then((ok) => ok && navigate('/setup'))
+    }
+  }
+
+  // Delete is for an account that was never used; the database says why if it can't.
+  function deleteThisAccount() {
+    if (window.confirm(`Delete ${account.name} for good? This only works for an account that was never used. Otherwise archive it.`)) {
+      run(() => deleteAccount(account.id)).then((ok) => ok && navigate('/setup'))
     }
   }
 
@@ -311,6 +318,9 @@ export default function AccountItemsScreen() {
             </button>
             <button type="button" className="small-button small-button--danger" disabled={busy} onClick={archiveAccount}>
               Archive account
+            </button>
+            <button type="button" className="small-button small-button--danger" disabled={busy} onClick={deleteThisAccount}>
+              Delete account
             </button>
           </div>
         )}

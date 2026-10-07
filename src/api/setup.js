@@ -180,6 +180,18 @@ export async function deleteBank(bankId) {
   if (error) throw error
 }
 
+// Delete an account or bank that was never used (the database refuses, with a reason,
+// if it has history or anything still points at it). Archive is for the rest.
+export async function deleteAccount(accountId) {
+  const { error } = await supabase.rpc('delete_account', { p_account_id: accountId })
+  if (error) throw new Error(error.message)
+}
+
+export async function deleteUnusedBank(bankId) {
+  const { error } = await supabase.rpc('delete_unused_bank', { p_bank_id: bankId })
+  if (error) throw new Error(error.message)
+}
+
 // ---- Step 15: move a budget item to another account (it brings its money and history) ----
 // Returns { balance, from_account, to_account, removed_from_splits: [source names] }.
 export async function moveItem(itemId, toAccountId) {
