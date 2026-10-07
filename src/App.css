@@ -1015,3 +1015,4 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .example-field { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .example-field input { width: 110px; height: 36px; padding: 0 10px; border: 1px solid #cfcfc8; border-radius: 8px; background: #fafaf7; font: 500 15px var(--mono); }
 .account-totals .remaining-row { margin-top: 4px; padding-top: 8px; border-top: 1px solid #ecece6; font-weight: 600; }
+.guide-section h3 { margin: 16px 0 4px; font: 600 14px var(--sans); color: var(--ink); }

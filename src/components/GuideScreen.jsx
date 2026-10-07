@@ -222,6 +222,48 @@ export default function GuideScreen() {
             </tbody>
           </table>
           <p className="hint">Checking still matches the bank after a card spend, because nothing left it yet.</p>
+
+          <h3>Add a card</h3>
+          <ol>
+            <li>Setup → under the bank that issues the card (same currency as the account you pay it from) → + Add account or card.</li>
+            <li>Switch to Credit card and type the card’s name, like Visa.</li>
+            <li>Owed today: the current balance from your card app (everything owed, not just this month’s statement). Leave it blank for $0.</li>
+            <li>Paid from: the bank account you pay the bill from.</li>
+            <li>Tap Add card. DollarHome adds a “Visa payment” envelope to that account and a CARD section on the bank’s tab. A card holds no budget items of its own.</li>
+          </ol>
+
+          <h3>A card that already has a balance</h3>
+          <p>
+            That debt is already on the card, but no money is set aside for it yet, so “Visa payment” starts empty and shows
+            as short. Give it money with Assign (from Unassigned) or Move (from other envelopes), as much as you can now,
+            and top it up as paychecks come in. When it covers what the card owes, it shows “covered”.
+          </p>
+
+          <h3>Spend on the card</h3>
+          <p>
+            Tap a budget item as usual, enter the amount, and under Paid with pick the card instead of Bank. The item drops,
+            the payment envelope goes up and the card owes more. Delete a past spend from the item’s Recent list to undo it.
+          </p>
+
+          <h3>Pay the card</h3>
+          <p>
+            On the card’s section tap Pay card. The amount starts at what the card owes, or what the payment envelope holds
+            if that’s less. Change the amount or date and save, then make the same payment in your bank app. You can’t
+            pay more than the card owes. If the envelope holds less than the payment, DollarHome warns you and lets it go
+            below zero.
+          </p>
+
+          <h3>Update the balance</h3>
+          <p>
+            Paying lowers what DollarHome says you owe, but the statement number stays as you last typed it. After a payment, a
+            new statement or interest, tap Update on the card’s match line, type what your card app says you owe, and
+            choose:
+          </p>
+          <ul>
+            <li>Save and adjust to match: DollarHome’s “owes” figure is changed to your number. Use this for an unlogged purchase or interest.</li>
+            <li>Save balance only: records your number without changing what DollarHome says. Use this if you expect to log the missing items yourself.</li>
+          </ul>
+          <p className="hint">Green “Matches statement” means the two agree.</p>
         </Section>
 
         <Section title="Analytics">
