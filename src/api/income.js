@@ -87,9 +87,16 @@ export async function fetchUsedSourceIds() {
   return new Set(data.map((e) => e.source_id))
 }
 
-// Delete a source that has never been used. Its split lines go with it.
-// The database check is the real guard: refuse if any income was recorded.
+// Delete a source with no split lines and no income ever recorded.
+// Checked again here, right before deleting, in case the list was out of date.
 export async function deleteSource(id) {
+  const { count: lineCount, error: lineError } = await supabase
+    .from('split_lines')
+    .select('source_id', { count: 'exact', head: false })
+    .eq('source_id', id)
+    .limit(1)
+  if (lineError) throw lineError
+  if (lineCount > 0) throw new Error('This source still has split lines, so it can only be archived.')
   const { count, error: countError } = await supabase
     .from('income_events')
     .select('id', { count: 'exact', head: false })

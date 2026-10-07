@@ -63,7 +63,8 @@ export default function IncomeSourcesScreen() {
     }
   }
 
-  // Never-used sources get Delete; ones with income history keep Archive.
+  // Delete only for a source with no split lines and no income ever; everything else is archived.
+  const canDelete = (s) => s.lines.length === 0 && !used.has(s.id)
   function deleteButton(s) {
     return (
       <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => handleDelete(s)}>
@@ -150,15 +151,12 @@ export default function IncomeSourcesScreen() {
                 <Link to={`/setup/income/${s.id}`} className="small-button">
                   Edit split
                 </Link>
-                <Link to={`/setup/income/new?copy=${s.id}`} className="small-button">
-                  Duplicate
-                </Link>
-                {used.has(s.id) ? (
+                {canDelete(s) ? (
+                  deleteButton(s)
+                ) : (
                   <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => toggleArchived(s, true)}>
                     Archive
                   </button>
-                ) : (
-                  deleteButton(s)
                 )}
               </div>
             </div>
@@ -178,7 +176,7 @@ export default function IncomeSourcesScreen() {
               <button type="button" className="small-button" disabled={busy} onClick={() => toggleArchived(s, false)}>
                 Restore
               </button>
-              {!used.has(s.id) && deleteButton(s)}
+              {canDelete(s) && deleteButton(s)}
             </span>
           </div>
         ))}
