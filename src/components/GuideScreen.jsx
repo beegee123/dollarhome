@@ -231,6 +231,11 @@ export default function GuideScreen() {
             <li>Paid from: the bank account you pay the bill from.</li>
             <li>Tap Add card. DollarHome adds a “Visa payment” envelope to that account and a CARD section on the bank’s tab. A card holds no budget items of its own.</li>
           </ol>
+          <p>
+            Added it as a bank account by mistake? Setup → the account → Account settings → Change to a credit card. Type what it
+            owes and choose the account that pays it. This only works while the account has no budget items, no income source
+            landing in it and no activity; otherwise archive it and add the card fresh.
+          </p>
 
           <h3>A card that already has a balance</h3>
           <p>

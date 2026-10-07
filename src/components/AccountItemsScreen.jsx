@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
+import { convertToCard } from '../api/cards.js'
 import { addItem, adjustToBank, deleteAccount, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
 import { formatMoney, monthYear, parseBalance, shortDate, targetPace } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
@@ -325,6 +326,19 @@ export default function AccountItemsScreen() {
           </div>
         )}
         <p className="hint">Order sets where this section appears on the {account.bank.name} tab.</p>
+        {!isCard && (
+          <ConvertToCard
+            account={account}
+            currency={currency}
+            hasItems={items.some((i) => !i.is_unassigned)}
+            busy={busy}
+            onConvert={async ({ owed, paysFromAccountId }) => {
+              const ok = await run(() => convertToCard({ accountId: account.id, owed, paysFromAccountId }))
+              if (ok) setNotice(`${account.name} is now a credit card. Give its payment envelope money with Assign or Move.`)
+              return ok
+            }}
+          />
+        )}
       </details>
 
       {balanceOpen && (
@@ -468,6 +482,88 @@ function ItemForm({ currency, initial, submitLabel, busy, onSubmit, onCancel, cl
 
 // "Move to another account": pick a bank account in the same currency.
 // The item always brings its money and history along.
+// Settings → "Change to a credit card", for an account that was added as a bank account by mistake.
+function ConvertToCard({ account, currency, hasItems, busy, onConvert }) {
+  const [open, setOpen] = useState(false)
+  const [payers, setPayers] = useState(null)
+  const [owedText, setOwedText] = useState(account.bank_balance > 0 ? String(account.bank_balance) : '')
+  const [paysFrom, setPaysFrom] = useState('')
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!open || payers) return
+    fetchSetup()
+      .then((banks) =>
+        setPayers(
+          banks
+            .filter((b) => !b.archived && b.currency === currency)
+            .flatMap((b) =>
+              b.accounts
+                .filter((a) => !a.archived && a.kind !== 'credit' && a.id !== account.id)
+                .map((a) => ({ id: a.id, label: `${b.name} · ${a.name}` })),
+            ),
+        ),
+      )
+      .catch(() => setPayers([]))
+  }, [open, payers, currency, account.id])
+
+  if (!open) {
+    return (
+      <button type="button" className="link-button add-link" onClick={() => setOpen(true)}>
+        Change to a credit card
+      </button>
+    )
+  }
+
+  return (
+    <div className="move-item">
+      <p className="hint">
+        For an account you added as a bank account by mistake. It only works while the account has no budget items, no income
+        source landing in it and no activity.
+        {hasItems && ' This one still has budget items, so move or archive them first.'}
+      </p>
+      <label className="field">
+        <span>Owed today ({currency})</span>
+        <input inputMode="decimal" placeholder="0.00" value={owedText} onChange={(e) => setOwedText(e.target.value)} />
+      </label>
+      {payers === null && <p className="muted">Loading accounts…</p>}
+      {payers?.length === 0 && <p className="muted">No {currency} bank account to pay it from.</p>}
+      {payers?.length > 0 && (
+        <label className="field">
+          <span>Paid from</span>
+          <select className="field-select" value={paysFrom} onChange={(e) => setPaysFrom(e.target.value)}>
+            <option value="">Choose a {currency} account…</option>
+            {payers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {error && <p className="notice">{error}</p>}
+      <div className="inline-form">
+        <button
+          type="button"
+          className="small-button"
+          disabled={busy || !paysFrom}
+          onClick={async () => {
+            const owed = owedText.trim() === '' ? 0 : parseBalance(owedText)
+            if (owed === null || owed < 0) return setError('Enter what the card owes today, like 640 (or leave it blank for 0).')
+            setError(null)
+            if (await onConvert({ owed, paysFromAccountId: paysFrom })) setOpen(false)
+          }}
+        >
+          Change to card
+        </button>
+        <button type="button" className="small-button" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function MoveItem({ item, account, currency, busy, onMove }) {
   const [open, setOpen] = useState(false)
   const [targets, setTargets] = useState(null)

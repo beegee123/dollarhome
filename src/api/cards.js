@@ -17,6 +17,17 @@ export async function addCard({ bankId, name, owed, paysFromAccountId }) {
   return data
 }
 
+// Change a bank account that was added by mistake into a credit card.
+// The database refuses (with a reason) if the account has budget items, income or activity.
+export async function convertToCard({ accountId, owed, paysFromAccountId }) {
+  const { error } = await supabase.rpc('convert_to_card', {
+    p_account_id: accountId,
+    p_owed: owed,
+    p_pays_from: paysFromAccountId,
+  })
+  if (error) throw new Error(error.message)
+}
+
 // Spend from a budget item, paid with a card. Returns a pair id (Undo deletes the pair).
 export async function cardSpend({ categoryId, cardId, amount, spentOn, note }) {
   const { data, error } = await supabase.rpc('card_spend', {
