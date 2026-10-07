@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { fetchMonthIncome, fetchSources, setSourceArchived } from '../api/income.js'
+import { deleteSource, fetchMonthIncome, fetchSources, fetchUsedSourceIds, setSourceArchived } from '../api/income.js'
 import { formatMoney } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -8,6 +8,8 @@ import { friendlyError } from '../lib/errors.js'
 export default function IncomeSourcesScreen() {
   const [sources, setSources] = useState(null)
   const [month, setMonth] = useState({}) // source id → { total, count } this month
+  const [used, setUsed] = useState(new Set()) // sources that have ever brought money in
+  const [confirmDelete, setConfirmDelete] = useState(null) // source id waiting for a second tap
   const [loadError, setLoadError] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -15,11 +17,12 @@ export default function IncomeSourcesScreen() {
 
   useEffect(() => {
     let ignore = false
-    Promise.all([fetchSources(), fetchMonthIncome()])
-      .then(([s, m]) => {
+    Promise.all([fetchSources(), fetchMonthIncome(), fetchUsedSourceIds()])
+      .then(([s, m, u]) => {
         if (ignore) return
         setSources(s)
         setMonth(m)
+        setUsed(u)
         setLoadError(null)
       })
       .catch((err) => !ignore && setLoadError(friendlyError(err)))
@@ -39,6 +42,34 @@ export default function IncomeSourcesScreen() {
     } finally {
       setBusy(false)
     }
+  }
+
+  // Delete takes two taps: the first turns the button into "Tap again to delete".
+  async function handleDelete(source) {
+    if (confirmDelete !== source.id) {
+      setConfirmDelete(source.id)
+      return
+    }
+    setConfirmDelete(null)
+    setBusy(true)
+    setActionError(null)
+    try {
+      await deleteSource(source.id)
+      setReloadCount((n) => n + 1)
+    } catch (err) {
+      setActionError(friendlyError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Never-used sources get Delete; ones with income history keep Archive.
+  function deleteButton(s) {
+    return (
+      <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => handleDelete(s)}>
+        {confirmDelete === s.id ? 'Tap again to delete' : 'Delete'}
+      </button>
+    )
   }
 
   if (loadError) {
@@ -122,9 +153,13 @@ export default function IncomeSourcesScreen() {
                 <Link to={`/setup/income/new?copy=${s.id}`} className="small-button">
                   Duplicate
                 </Link>
-                <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => toggleArchived(s, true)}>
-                  Archive
-                </button>
+                {used.has(s.id) ? (
+                  <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => toggleArchived(s, true)}>
+                    Archive
+                  </button>
+                ) : (
+                  deleteButton(s)
+                )}
               </div>
             </div>
           )
@@ -139,9 +174,12 @@ export default function IncomeSourcesScreen() {
             <span>
               {s.name} <span className="muted">· archived</span>
             </span>
-            <button type="button" className="small-button" disabled={busy} onClick={() => toggleArchived(s, false)}>
-              Restore
-            </button>
+            <span className="row-actions">
+              <button type="button" className="small-button" disabled={busy} onClick={() => toggleArchived(s, false)}>
+                Restore
+              </button>
+              {!used.has(s.id) && deleteButton(s)}
+            </span>
           </div>
         ))}
       </main>

@@ -79,6 +79,28 @@ export async function saveSource({ id, name, accountId, splitType, lines, expect
   return data
 }
 
+// Ids of the sources that have ever brought money in. Those keep their history,
+// so they can only be archived; the rest can be deleted outright.
+export async function fetchUsedSourceIds() {
+  const { data, error } = await supabase.from('income_events').select('source_id').not('source_id', 'is', null)
+  if (error) throw error
+  return new Set(data.map((e) => e.source_id))
+}
+
+// Delete a source that has never been used. Its split lines go with it.
+// The database check is the real guard: refuse if any income was recorded.
+export async function deleteSource(id) {
+  const { count, error: countError } = await supabase
+    .from('income_events')
+    .select('id', { count: 'exact', head: false })
+    .eq('source_id', id)
+    .limit(1)
+  if (countError) throw countError
+  if (count > 0) throw new Error('This source has income recorded, so it can only be archived.')
+  const { error } = await supabase.from('income_sources').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function setSourceArchived(id, archived) {
   const { error } = await supabase.from('income_sources').update({ archived }).eq('id', id)
   if (error) throw error
