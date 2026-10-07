@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { fetchNote, saveNote } from '../api/notes.js'
@@ -46,31 +46,24 @@ export default function NotesScreen() {
   )
 }
 
+// Created once, outside the component. Building these again on every render makes the editor
+// rebuild itself each time the "Saved" line changes, which froze the note after using Bold.
+const EXTENSIONS = [
+  // Keep it to what a bill note needs.
+  StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: false, underline: false }),
+  TaskList,
+  TaskItem.configure({ nested: true }),
+]
+const EDITOR_PROPS = {
+  attributes: { class: 'notes-editor', 'aria-label': 'Bill notes', role: 'textbox', 'aria-multiline': 'true' },
+}
+
 function NoteEditor({ initialHtml, updatedAt }) {
   const [status, setStatus] = useState(updatedAt ? `Saved ${when(updatedAt)}` : '')
   const saved = useRef(initialHtml) // what the database has
   const timer = useRef(null)
 
-  const editor = useEditor({
-    extensions: [
-      // Keep it to what a bill note needs.
-      StarterKit.configure({ heading: false, blockquote: false, code: false, codeBlock: false, horizontalRule: false, link: false, underline: false }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-    ],
-    content: initialHtml,
-    editorProps: {
-      attributes: { class: 'notes-editor', 'aria-label': 'Bill notes', role: 'textbox', 'aria-multiline': 'true' },
-    },
-    onUpdate: ({ editor }) => {
-      setStatus('Not saved yet')
-      clearTimeout(timer.current)
-      timer.current = setTimeout(() => save(editor), 1000)
-    },
-    onBlur: ({ editor }) => save(editor),
-  })
-
-  async function save(ed) {
+  const save = useCallback(async (ed) => {
     clearTimeout(timer.current)
     const html = ed.isEmpty ? '' : ed.getHTML()
     if (html === saved.current) return
@@ -82,17 +75,54 @@ function NoteEditor({ initialHtml, updatedAt }) {
     } catch (err) {
       setStatus(`Not saved: ${friendlyError(err)}`)
     }
-  }
+  }, [])
+
+  const editor = useEditor({
+    extensions: EXTENSIONS,
+    content: initialHtml,
+    editorProps: EDITOR_PROPS,
+    shouldRerenderOnTransaction: false, // the toolbar listens for itself (Toolbar below)
+    onUpdate: ({ editor }) => {
+      setStatus('Not saved yet')
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => save(editor), 1000)
+    },
+    onBlur: ({ editor }) => save(editor),
+  })
 
   // Save anything still waiting when leaving the screen.
   useEffect(() => {
     return () => {
       if (editor && !editor.isDestroyed) save(editor)
     }
-  }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editor, save])
 
   if (!editor) return <p className="muted center-message">Loading…</p>
 
+  return (
+    <>
+      <Toolbar editor={editor} />
+      <EditorContent editor={editor} />
+      <p className={`muted notes-status ${status.startsWith('Not saved:') ? 'match-off' : ''}`} aria-live="polite">
+        {status}
+      </p>
+    </>
+  )
+}
+
+function Toolbar({ editor }) {
+  // Re-reads which buttons are "on" whenever the cursor or text changes.
+  const on = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      bold: e.isActive('bold'),
+      italic: e.isActive('italic'),
+      strike: e.isActive('strike'),
+      bulletList: e.isActive('bulletList'),
+      orderedList: e.isActive('orderedList'),
+      taskList: e.isActive('taskList'),
+    }),
+  })
   const buttons = [
     { label: 'B', title: 'Bold', cls: 'tb-bold', active: 'bold', run: () => editor.chain().focus().toggleBold().run() },
     { label: 'I', title: 'Italic', cls: 'tb-italic', active: 'italic', run: () => editor.chain().focus().toggleItalic().run() },
@@ -101,31 +131,25 @@ function NoteEditor({ initialHtml, updatedAt }) {
     { label: '1.', title: 'Numbered list', active: 'orderedList', run: () => editor.chain().focus().toggleOrderedList().run() },
     { label: '☐', title: 'Checklist', active: 'taskList', run: () => editor.chain().focus().toggleTaskList().run() },
   ]
-
   return (
-    <>
-      <div className="notes-toolbar" role="toolbar" aria-label="Formatting">
-        {buttons.map((b) => (
-          <button
-            key={b.title}
-            type="button"
-            className={`tb-button ${b.cls ?? ''} ${editor.isActive(b.active) ? 'on' : ''}`}
-            title={b.title}
-            aria-label={b.title}
-            aria-pressed={editor.isActive(b.active)}
-            // Keep the cursor in the note when tapping a button.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={b.run}
-          >
-            {b.label}
-          </button>
-        ))}
-      </div>
-      <EditorContent editor={editor} />
-      <p className={`muted notes-status ${status.startsWith('Not saved:') ? 'match-off' : ''}`} aria-live="polite">
-        {status}
-      </p>
-    </>
+    <div className="notes-toolbar" role="toolbar" aria-label="Formatting">
+      {buttons.map((b) => (
+        <button
+          key={b.title}
+          type="button"
+          className={`tb-button ${b.cls ?? ''} ${on?.[b.active] ? 'on' : ''}`}
+          title={b.title}
+          aria-label={b.title}
+          aria-pressed={!!on?.[b.active]}
+          // Keep the cursor in the note when tapping a button.
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={b.run}
+        >
+          {b.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
