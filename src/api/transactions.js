@@ -105,20 +105,38 @@ export async function fetchMovesSinceCheck(accountId) {
 
   const { data, error } = await supabase
     .from('transactions')
-    .select('pair_id, amount, kind, occurred_on, created_at, category:categories (account_id, account:accounts (name, bank:banks (name)))')
+    .select('pair_id, amount, kind, occurred_on, created_at, category_id')
     .gt('created_at', since)
     .not('pair_id', 'is', null)
   if (error) throw error
+
+  // Look up each budget item's account separately (an embed is ambiguous: the two tables
+  // link in both directions).
+  const catIds = [...new Set(data.map((t) => t.category_id))]
+  const catAccount = new Map()
+  const accountName = new Map()
+  if (catIds.length) {
+    const { data: cats, error: e2 } = await supabase.from('categories').select('id, account_id').in('id', catIds)
+    if (e2) throw e2
+    for (const c of cats) catAccount.set(c.id, c.account_id)
+    const accIds = [...new Set(cats.map((c) => c.account_id))]
+    const { data: accs, error: e3 } = await supabase
+      .from('accounts')
+      .select('id, name, bank:banks (name)')
+      .in('id', accIds)
+    if (e3) throw e3
+    for (const a of accs) accountName.set(a.id, a.bank?.name ? `${a.bank.name} ${a.name}` : a.name)
+  }
 
   const pairs = new Map()
   for (const t of data) {
     const p = pairs.get(t.pair_id) ?? { pairId: t.pair_id, net: 0, kind: t.kind, date: t.occurred_on, created: t.created_at, others: new Set(), kinds: new Set() }
     p.kinds.add(t.kind)
-    if (t.category?.account_id === accountId) {
+    const acc = catAccount.get(t.category_id)
+    if (acc === accountId) {
       p.net += Number(t.amount)
-    } else if (t.category?.account) {
-      const a = t.category.account
-      p.others.add(a.bank?.name ? `${a.bank.name} ${a.name}` : a.name)
+    } else if (acc) {
+      p.others.add(accountName.get(acc) ?? 'another account')
     }
     pairs.set(t.pair_id, p)
   }
