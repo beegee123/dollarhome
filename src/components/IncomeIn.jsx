@@ -54,7 +54,9 @@ export default function IncomeIn({ banks, onApply, onClose }) {
     setEdits({})
     setError(null)
     // A fixed split suggests its usual total; a percent split waits for you to type the payout.
-    setAmountText(s.split_type === 'fixed' ? String(s.lines.reduce((sum, l) => sum + l.value, 0)) : '')
+    setAmountText(
+      s.split_type === 'fixed' ? String(s.expected_amount ?? s.lines.reduce((sum, l) => sum + l.value, 0)) : '',
+    )
   }
 
   const amount = parseAmount(amountText)

@@ -6,12 +6,12 @@ export async function fetchSources() {
   const { data, error } = await supabase
     .from('income_sources')
     .select(
-      'id, name, split_type, sort_order, archived, account:accounts (id, name, bank:banks (id, name, currency)), lines:split_lines (category_id, value)',
+      'id, name, split_type, expected_amount, sort_order, archived, account:accounts (id, name, bank:banks (id, name, currency)), lines:split_lines (category_id, value)',
     )
     .order('sort_order')
     .order('name')
   if (error) throw error
-  return data.map((s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, value: Number(l.value) })) }))
+  return data.map((s) => ({ ...s, expected_amount: s.expected_amount === null ? null : Number(s.expected_amount), lines: s.lines.map((l) => ({ ...l, value: Number(l.value) })) }))
 }
 
 // What the income source form needs: every active bank → account → budget item
@@ -31,7 +31,7 @@ export async function fetchSourceForm(sourceId) {
     sourceId
       ? supabase
           .from('income_sources')
-          .select('id, name, account_id, split_type, lines:split_lines (category_id, value)')
+          .select('id, name, account_id, split_type, expected_amount, lines:split_lines (category_id, value)')
           .eq('id', sourceId)
           .single()
       : Promise.resolve({ data: null, error: null }),
@@ -58,7 +58,7 @@ export async function fetchSourceForm(sourceId) {
 }
 
 // Save a source and its lines in one go (the save_income_source database function).
-export async function saveSource({ id, name, accountId, splitType, lines }) {
+export async function saveSource({ id, name, accountId, splitType, lines, expectedAmount = null }) {
   const { data, error } = await supabase.rpc('save_income_source', {
     p_id: id ?? null,
     p_name: name,
@@ -70,6 +70,12 @@ export async function saveSource({ id, name, accountId, splitType, lines }) {
     if (error.code === '23505') throw new Error(`You already have an income source called “${name.trim()}”.`)
     throw error
   }
+  // The usual amount is a plain column, saved right after the split.
+  const { error: amountError } = await supabase
+    .from('income_sources')
+    .update({ expected_amount: expectedAmount })
+    .eq('id', data)
+  if (amountError) throw amountError
   return data
 }
 

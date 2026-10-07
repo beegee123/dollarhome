@@ -21,7 +21,7 @@ export default function IncomeSourceForm() {
   const [splitType, setSplitType] = useState('fixed')
   const [values, setValues] = useState({}) // budget item id → what's typed in its box
   const [showOthers, setShowOthers] = useState(false) // show the bank's OTHER accounts (transfers)?
-  const [example, setExample] = useState('') // a paycheck/payout amount, just to see what's left (not saved)
+  const [example, setExample] = useState('') // the usual paycheck/payout amount (saved with the source)
 
   useEffect(() => {
     let ignore = false
@@ -33,6 +33,7 @@ export default function IncomeSourceForm() {
           setName(source.name)
           setAccountId(source.account_id)
           setSplitType(source.split_type)
+          setExample(source.expected_amount ? String(source.expected_amount) : '')
           setValues(Object.fromEntries(source.lines.map((l) => [l.category_id, String(l.value)])))
           // If this split already sends money to another account, open that part.
           const landingItems = new Set(
@@ -115,6 +116,10 @@ export default function IncomeSourceForm() {
       setSaveError('Each amount must be a number above 0 (leave a box blank to skip that item).')
       return
     }
+    if (example.trim() !== '' && !(examplePayout > 0)) {
+      setSaveError('The usual amount must be a number above 0, or blank.')
+      return
+    }
     if (percentOff) {
       setSaveError(`Percentages must add up to 100. They add up to ${total}.`)
       return
@@ -122,7 +127,7 @@ export default function IncomeSourceForm() {
     setBusy(true)
     setSaveError(null)
     try {
-      await saveSource({ id: isNew ? null : sourceId, name, accountId, splitType, lines })
+      await saveSource({ id: isNew ? null : sourceId, name, accountId, splitType, lines, expectedAmount: examplePayout > 0 ? examplePayout : null })
       navigate('/setup/income')
     } catch (err) {
       setSaveError(friendlyError(err))
@@ -214,7 +219,7 @@ export default function IncomeSourceForm() {
           </p>
           <label className="example-field">
             <span className="muted">
-              {splitType === 'fixed' ? 'Paycheck amount (to see what’s left)' : 'See it in dollars for a payout of'}
+              {splitType === 'fixed' ? 'Usual paycheck amount' : 'Typical payout (to see it in dollars)'}
             </span>
             <input inputMode="decimal" placeholder={splitType === 'fixed' ? 'e.g. 2400' : 'e.g. 1850'} value={example} onChange={(e) => setExample(e.target.value)} />
           </label>
@@ -239,7 +244,7 @@ export default function IncomeSourceForm() {
                   <span>{showWithDollars(Math.abs(remaining))}</span>
                 </div>
               )}
-              {remaining === null && <p className="hint">Type the paycheck amount above to see what’s left to allocate.</p>}
+              {remaining === null && <p className="hint">Add the usual paycheck amount above to see what’s left to allocate. It’s saved with this source.</p>}
               {transfers.length > 0 && (
                 <p className="hint">
                   At {bank.name}, move{' '}
