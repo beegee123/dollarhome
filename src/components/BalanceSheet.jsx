@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatMoney, parseBalance } from '../lib/money.js'
+import { formatMoney, parseBalance, shortDate } from '../lib/money.js'
+import { fetchMovesSinceCheck } from '../api/transactions.js'
 
 // "Update bank balance": type what your bank's app shows for this account.
 // Props:
@@ -16,6 +17,24 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
+  const [moves, setMoves] = useState([])
+  const [ticked, setTicked] = useState({})
+  const startBalance = useRef(Number(account.bank_balance) || 0)
+
+  // Moves since the last update, as tick boxes (cash accounts only).
+  useEffect(() => {
+    if (isCard || !account.id) return
+    let live = true
+    fetchMovesSinceCheck(account.id).then((m) => live && setMoves(m)).catch(() => {})
+    return () => { live = false }
+  }, [account.id, isCard])
+
+  function toggleMove(m) {
+    const next = { ...ticked, [m.pairId]: !ticked[m.pairId] }
+    setTicked(next)
+    const sum = moves.reduce((acc, x) => acc + (next[x.pairId] ? x.net : 0), 0)
+    setText(String(Math.round((startBalance.current + sum) * 100) / 100))
+  }
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -86,6 +105,20 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
               onChange={(e) => setText(e.target.value)}
             />
           </label>
+
+          {!isCard && moves.length > 0 && (
+            <fieldset className="moves-box">
+              <legend className="field-label">Moved since you last updated</legend>
+              <p className="hint">Tick a move to add or subtract it from your last balance.</p>
+              {moves.map((m) => (
+                <label key={m.pairId} className="move-row">
+                  <input type="checkbox" checked={!!ticked[m.pairId]} onChange={() => toggleMove(m)} />
+                  <span>{shortDate(m.date)} · {m.label}</span>
+                  <span className="money">{m.net > 0 ? '+' : '−'}{formatMoney(Math.abs(m.net), currency)}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
 
           <p className="after-line">
             {isCard ? 'DollarHome says this card owes ' : 'DollarHome holds '}

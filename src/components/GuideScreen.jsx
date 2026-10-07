@@ -114,6 +114,10 @@ export default function GuideScreen() {
               <span className="match-off">Off by $X vs bank</span>.
             </li>
             <li>Tap it and type what your bank app shows. Less in the bank usually means an unlogged spend; more, unlogged income.</li>
+            <li>
+              If you moved money since your last update, the sheet lists those moves with tick boxes. Tick one to add or
+              subtract exactly that amount from your last balance, so you don’t have to type it. You can still edit the number.
+            </li>
             <li>Save balance only records the bank’s number; it never moves money between items.</li>
             <li>
               Know the bank is right (old sample numbers, a restart)? Use <strong>Save and adjust to match</strong>: the

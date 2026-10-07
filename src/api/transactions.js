@@ -89,3 +89,51 @@ export async function deletePairs(pairIds) {
   const { error } = await supabase.from('transactions').delete().in('pair_id', pairIds)
   if (error) throw error
 }
+
+// Moves, transfers and card payments that touched one account since its balance was last
+// updated. Each comes back as ONE row with the net effect on this account, so ticking it
+// in the balance sheet can add or subtract exactly that amount. Moves that stay inside
+// the account (net zero) are left out.
+export async function fetchMovesSinceCheck(accountId) {
+  const { data: acct, error: e1 } = await supabase
+    .from('accounts')
+    .select('balance_checked_at')
+    .eq('id', accountId)
+    .single()
+  if (e1) throw e1
+  const since = acct.balance_checked_at ?? new Date(Date.now() - 14 * 86400000).toISOString()
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('pair_id, amount, kind, occurred_on, created_at, category:categories (account_id, account:accounts (name, bank:banks (name)))')
+    .gt('created_at', since)
+    .not('pair_id', 'is', null)
+  if (error) throw error
+
+  const pairs = new Map()
+  for (const t of data) {
+    const p = pairs.get(t.pair_id) ?? { pairId: t.pair_id, net: 0, kind: t.kind, date: t.occurred_on, created: t.created_at, others: new Set(), kinds: new Set() }
+    p.kinds.add(t.kind)
+    if (t.category?.account_id === accountId) {
+      p.net += Number(t.amount)
+    } else if (t.category?.account) {
+      const a = t.category.account
+      p.others.add(a.bank?.name ? `${a.bank.name} ${a.name}` : a.name)
+    }
+    pairs.set(t.pair_id, p)
+  }
+  return [...pairs.values()]
+    .map((p) => ({ ...p, net: Math.round(p.net * 100) / 100 }))
+    .filter((p) => p.net !== 0)
+    .sort((a, b) => (a.created < b.created ? 1 : -1))
+    .map((p) => ({
+      pairId: p.pairId,
+      net: p.net,
+      date: p.date,
+      label: p.kinds.has('card_payment')
+        ? 'Paid a credit card'
+        : p.others.size
+          ? `${p.net > 0 ? 'From' : 'To'} ${[...p.others].join(', ')}`
+          : 'Move',
+    }))
+}
