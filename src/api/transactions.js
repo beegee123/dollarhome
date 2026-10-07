@@ -122,7 +122,7 @@ export async function fetchMovesSinceCheck(accountId) {
     }
     pairs.set(t.pair_id, p)
   }
-  return [...pairs.values()]
+  const list = [...pairs.values()]
     .map((p) => ({ ...p, net: Math.round(p.net * 100) / 100 }))
     .filter((p) => p.net !== 0)
     .sort((a, b) => (a.created < b.created ? 1 : -1))
@@ -136,4 +136,5 @@ export async function fetchMovesSinceCheck(accountId) {
           ? `${p.net > 0 ? 'From' : 'To'} ${[...p.others].join(', ')}`
           : 'Move',
     }))
+  return { since, hadCheck: !!acct.balance_checked_at, list }
 }

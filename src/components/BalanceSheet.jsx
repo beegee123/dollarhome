@@ -18,6 +18,7 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
   const [moves, setMoves] = useState([])
+  const [movesInfo, setMovesInfo] = useState({ state: 'loading' })
   const [ticked, setTicked] = useState({})
   const startBalance = useRef(Number(account.bank_balance) || 0)
 
@@ -25,7 +26,13 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
   useEffect(() => {
     if (isCard || !account.id) return
     let live = true
-    fetchMovesSinceCheck(account.id).then((m) => live && setMoves(m)).catch(() => {})
+    fetchMovesSinceCheck(account.id)
+      .then((r) => {
+        if (!live) return
+        setMoves(r.list)
+        setMovesInfo({ state: 'ok', since: r.since, hadCheck: r.hadCheck })
+      })
+      .catch((e) => live && setMovesInfo({ state: 'error', message: e?.message || String(e) }))
     return () => { live = false }
   }, [account.id, isCard])
 
@@ -106,6 +113,14 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
             />
           </label>
 
+          {!isCard && movesInfo.state === 'error' && (
+            <p className="hint">Couldn’t load recent moves: {movesInfo.message}</p>
+          )}
+          {!isCard && movesInfo.state === 'ok' && moves.length === 0 && (
+            <p className="hint">
+              No moves to tick since {movesInfo.hadCheck ? 'you last updated this balance' : 'the last 14 days'} ({shortDate(movesInfo.since.slice(0, 10))}).
+            </p>
+          )}
           {!isCard && moves.length > 0 && (
             <fieldset className="moves-box">
               <legend className="field-label">Moved since you last updated</legend>
