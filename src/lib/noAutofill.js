@@ -3,9 +3,13 @@
 // envelope names and amounts. The sign-in form is left alone on purpose,
 // so you can still save your DollarHome password.
 const SKIP = '.sign-in'
+// Never touch anything inside a rich-text editor (Bill notes). The editor redraws any
+// checkbox whose attributes change, the redrawn checkbox got marked again, and the two
+// fed each other forever: the note froze as soon as a checklist appeared.
+const EDITOR = '[contenteditable], .ProseMirror'
 
 function mark(el) {
-  if (el.closest(SKIP) || el.dataset.noAutofill) return
+  if (el.closest(SKIP) || el.closest(EDITOR) || el.dataset.noAutofill) return
   el.dataset.noAutofill = '1'
   el.setAttribute('autocomplete', 'off')
   el.setAttribute('data-lpignore', 'true') // LastPass
@@ -15,7 +19,7 @@ function mark(el) {
 }
 
 function markAll(root) {
-  if (root.nodeType !== 1) return
+  if (root.nodeType !== 1 || root.closest(EDITOR)) return
   if (root.matches('form, input, textarea, select')) mark(root)
   root.querySelectorAll('form, input, textarea, select').forEach(mark)
 }
