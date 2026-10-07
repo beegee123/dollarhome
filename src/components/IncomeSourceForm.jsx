@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { fetchSourceForm, saveSource } from '../api/income.js'
 import { formatMoney, parseBalance } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // Add or edit one income source: its name, where it lands, and its split.
 // Address: /setup/income/new  or  /setup/income/<id>
+//          /setup/income/new?copy=<id>  starts a new source pre-filled from an existing one
 export default function IncomeSourceForm() {
   const { sourceId } = useParams()
   const isNew = sourceId === 'new'
+  const [searchParams] = useSearchParams()
+  const copyFrom = isNew ? searchParams.get('copy') : null // duplicating this source
   const navigate = useNavigate()
 
   const [banks, setBanks] = useState(null)
@@ -25,12 +28,12 @@ export default function IncomeSourceForm() {
 
   useEffect(() => {
     let ignore = false
-    fetchSourceForm(isNew ? null : sourceId)
+    fetchSourceForm(isNew ? copyFrom : sourceId)
       .then(({ banks, source }) => {
         if (ignore) return
         setBanks(banks)
         if (source) {
-          setName(source.name)
+          setName(copyFrom ? `${source.name} (copy)` : source.name)
           setAccountId(source.account_id)
           setSplitType(source.split_type)
           setExample(source.expected_amount ? String(source.expected_amount) : '')
@@ -48,7 +51,7 @@ export default function IncomeSourceForm() {
     return () => {
       ignore = true
     }
-  }, [sourceId, isNew])
+  }, [sourceId, isNew, copyFrom])
 
   if (loadError) {
     return (
@@ -151,7 +154,7 @@ export default function IncomeSourceForm() {
           ← Income sources
         </Link>
         <span className="eyebrow">DOLLARHOME</span>
-        <h1>{isNew ? 'New income source' : name || 'Income source'}</h1>
+        <h1>{copyFrom ? 'Copy of income source' : isNew ? 'New income source' : name || 'Income source'}</h1>
       </header>
 
       {banks.every((b) => b.accounts.length === 0) ? (
@@ -287,6 +290,11 @@ export default function IncomeSourceForm() {
               {busy ? 'Saving…' : 'Save'}
             </button>
           </div>
+          {!isNew && (
+            <Link to={`/setup/income/new?copy=${sourceId}`} className="link-button add-link">
+              Duplicate this source (opens a copy; this one stays as it is)
+            </Link>
+          )}
         </form>
       )}
     </div>

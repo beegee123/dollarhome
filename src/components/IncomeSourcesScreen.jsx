@@ -119,6 +119,9 @@ export default function IncomeSourcesScreen() {
                 <Link to={`/setup/income/${s.id}`} className="small-button">
                   Edit split
                 </Link>
+                <Link to={`/setup/income/new?copy=${s.id}`} className="small-button">
+                  Duplicate
+                </Link>
                 <button type="button" className="small-button small-button--danger" disabled={busy} onClick={() => toggleArchived(s, true)}>
                   Archive
                 </button>
