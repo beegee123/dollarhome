@@ -145,9 +145,11 @@ export default function BudgetScreen() {
     setReloadCount((n) => n + 1)
 
     const moves = transfers.map((t) => ({
-      id: `${eventId}-${t.accountName}`,
+      id: `${eventId}-${t.bankName}-${t.accountName}`,
       eventId,
-      text: `Move ${formatMoney(t.amount, currency)} from ${source.account.bank.name} ${source.account.name} to ${source.account.bank.name} ${t.accountName}`,
+      text: t.crossBank
+        ? `Send ${formatMoney(t.amount, currency)} from ${source.account.bank.name} ${source.account.name} to ${t.bankName} ${t.accountName} (bank-to-bank, 1–3 days)`
+        : `Move ${formatMoney(t.amount, currency)} from ${source.account.bank.name} ${source.account.name} to ${t.bankName} ${t.accountName}`,
     }))
     setReminders((r) => [...moves, ...r])
 

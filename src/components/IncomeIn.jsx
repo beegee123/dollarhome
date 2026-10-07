@@ -40,7 +40,7 @@ export default function IncomeIn({ banks, onApply, onClose }) {
   const itemInfo = useMemo(() => {
     const map = {}
     banks.forEach((b) =>
-      b.accounts.forEach((a) => a.items.forEach((i) => (map[i.id] = { name: i.name, accountId: a.id, accountName: a.name }))),
+      b.accounts.forEach((a) => a.items.forEach((i) => (map[i.id] = { name: i.name, accountId: a.id, accountName: a.name, bankId: b.id, bankName: b.name }))),
     )
     return map
   }, [banks])
@@ -92,7 +92,12 @@ export default function IncomeIn({ banks, onApply, onClose }) {
     lines
       .filter((l) => l.transfer && l.value > 0)
       .reduce((acc, l) => {
-        acc[l.accountId] = acc[l.accountId] ?? { accountName: l.accountName, amount: 0 }
+        acc[l.accountId] = acc[l.accountId] ?? {
+          accountName: l.accountName,
+          bankName: l.bankName,
+          crossBank: l.bankId !== source.account.bank.id,
+          amount: 0,
+        }
         acc[l.accountId].amount += l.value
         return acc
       }, {}),
@@ -185,7 +190,7 @@ export default function IncomeIn({ banks, onApply, onClose }) {
                         {l.name}
                         <span className="muted split-plan">
                           {l.percent !== null && ` ${l.percent}%`}
-                          {l.transfer && ` · ${l.accountName} (transfer)`}
+                          {l.transfer && (l.bankId === source.account.bank.id ? ` · ${l.accountName} (transfer)` : ` · ${l.bankName} ${l.accountName} (bank-to-bank)`)}
                         </span>
                       </span>
                       <span className="split-input">
@@ -214,8 +219,10 @@ export default function IncomeIn({ banks, onApply, onClose }) {
                       : `Left over → ${source.account.name} Unassigned: ${formatMoney(leftover, currency)}`}
                   </p>
                   {transfers.map((t) => (
-                    <p key={t.accountName} className="hint">
-                      Transfer {formatMoney(t.amount, currency)} to {t.accountName} — you’ll move it in your bank.
+                    <p key={`${t.bankName}-${t.accountName}`} className="hint">
+                      {t.crossBank
+                        ? `Send ${formatMoney(t.amount, currency)} to ${t.bankName} ${t.accountName} — bank-to-bank, takes 1–3 days.`
+                        : `Transfer ${formatMoney(t.amount, currency)} to ${t.accountName} — you’ll move it in your bank.`}
                     </p>
                   ))}
                 </div>

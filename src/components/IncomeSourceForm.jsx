@@ -63,10 +63,13 @@ export default function IncomeSourceForm() {
   }
   if (banks === null) return <div className="screen center-message muted">Loading…</div>
 
-  // The bank the money lands at decides which budget items can be in the split.
+  // The bank the money lands at sets the currency; any bank account in that currency can be in the split.
   const bank = banks.find((b) => b.accounts.some((a) => a.id === accountId))
   const currency = bank?.currency ?? 'USD'
-  const itemIdsAtBank = new Set(bank?.accounts.flatMap((a) => a.items.map((i) => i.id)) ?? [])
+  const otherBanks = banks.filter((b) => b.id !== bank?.id && b.currency === currency && b.accounts.length > 0)
+  const itemIdsAtBank = new Set(
+    [bank, ...otherBanks].filter(Boolean).flatMap((b) => b.accounts.flatMap((a) => a.items.map((i) => i.id))),
+  )
 
   // Turn the typed boxes into lines. Blank boxes are simply not in the split.
   const typed = Object.entries(values).filter(([id, text]) => itemIdsAtBank.has(id) && text.trim() !== '')
@@ -82,8 +85,14 @@ export default function IncomeSourceForm() {
   // Total per account, so you know how much to move between accounts at the real bank.
   const sumFor = (a) =>
     lines.filter((l) => l.value > 0 && a.items.some((i) => i.id === l.category_id)).reduce((sum, l) => sum + l.value, 0)
-  const perAccount = [landing, ...others].filter(Boolean).map((a) => ({ id: a.id, name: a.name, amount: sumFor(a) }))
-  const transfers = perAccount.filter((t) => t.id !== accountId && t.amount > 0)
+  const perAccount = [
+    ...[landing, ...others].filter(Boolean).map((a) => ({ id: a.id, name: a.name, amount: sumFor(a), crossBank: false })),
+    ...otherBanks.flatMap((b) =>
+      b.accounts.map((a) => ({ id: a.id, name: `${b.name} ${a.name}`, amount: sumFor(a), crossBank: true })),
+    ),
+  ]
+  const transfers = perAccount.filter((t) => t.id !== accountId && t.amount > 0 && !t.crossBank)
+  const bankToBank = perAccount.filter((t) => t.amount > 0 && t.crossBank)
   const examplePayout = parseBalance(example)
   // What's left to split: dollars for fixed splits (needs the paycheck amount), percent for percent splits.
   const remaining =
@@ -195,20 +204,26 @@ export default function IncomeSourceForm() {
           {landing && <SplitGroup account={landing} title={`${landing.name} · where it lands`} {...groupProps()} />}
 
           {/* The bank's other accounts: filling an item there means a transfer. Hidden until asked for. */}
-          {others.length > 0 &&
+          {(others.length > 0 || otherBanks.length > 0) &&
             (showOthers ? (
               <>
                 <p className="hint">
-                  Amounts below go to another {bank.name} account. The app records them as a transfer and reminds you
-                  to move the money in your bank. Leave them blank for no transfer.
+                  Amounts below go to another account. The app records them as a transfer and reminds you to move the
+                  money. Between banks it takes a few days, so send it as soon as the money lands. Leave them blank for
+                  no transfer.
                 </p>
                 {others.map((a) => (
                   <SplitGroup key={a.id} account={a} title={`${a.name} · transfer`} {...groupProps()} />
                 ))}
+                {otherBanks.flatMap((b) =>
+                  b.accounts.map((a) => (
+                    <SplitGroup key={a.id} account={a} title={`${b.name} · ${a.name} · bank-to-bank`} {...groupProps()} />
+                  )),
+                )}
               </>
             ) : (
               <button type="button" className="link-button add-link" onClick={() => setShowOthers(true)}>
-                + Send part to another {bank.name} account (transfer)
+                + Send part to another account (transfer)
               </button>
             ))}
 
@@ -250,6 +265,13 @@ export default function IncomeSourceForm() {
                   At {bank.name}, move{' '}
                   {transfers.map((t) => `${showWithDollars(t.amount)} to ${t.name}`).join(', ')} from {landing?.name}.
                   {splitType === 'fixed' && ' Anything above the split total stays in ' + landing?.name + ' (Unassigned).'}
+                </p>
+              )}
+              {bankToBank.length > 0 && (
+                <p className="hint">
+                  From {bank.name} {landing?.name}, send{' '}
+                  {bankToBank.map((t) => `${showWithDollars(t.amount)} to ${t.name}`).join(', ')} (bank-to-bank, takes
+                  1–3 days).
                 </p>
               )}
             </section>

@@ -101,7 +101,9 @@ export default function GuideScreen() {
           </p>
           <p>
             <strong>Moves vs transfers.</strong> Within one account nothing changes at the bank. Between accounts you get
-            a reminder to move the money in your bank app; tap Done ✓ once you have.
+            a reminder to move the money in your bank app; tap Done ✓ once you have. A split can also send part of a
+            paycheck to another bank in the same currency (e.g. RBC to Scotia); that reminder says “bank-to-bank” since
+            it takes a few days.
           </p>
         </Section>
 

@@ -34,6 +34,7 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 11. `011_loan_interest.sql` — loan interest: annual rate on debts, interest part of each payment
 12. `012_notes.sql` — Bill notes: one running note per person (Setup → Bill notes)
 13. `013_expected_amount.sql` — each income source can remember its usual amount
+14. `014_cross_bank_splits.sql` — income splits can fill items at other banks of the same currency (bank-to-bank transfers)
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 
