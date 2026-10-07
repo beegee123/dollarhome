@@ -290,7 +290,7 @@ export default function GuideScreen() {
             <li>
               Setup → Reset: Restart balances (keep setup, clear activity), Delete one bank, or Delete everything.
             </li>
-            <li>Setup → Bill notes is one running note for anything to remember about bills. It saves as you type.</li>
+            <li>Setup → Bill notes is one running note for anything to remember about bills. Use the buttons above it for bold, italic, strikethrough, bullets, numbering and checklists (a ticked item is struck through). It saves as you type.</li>
             <li>Sign out is at the bottom of Setup.</li>
           </ul>
         </Section>

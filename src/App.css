@@ -990,19 +990,32 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .mini-toggle button.on { background: var(--accent); color: #fff; }
 
 /* Bill notes */
-.notes-box {
-  width: 100%;
-  min-height: 60vh;
-  box-sizing: border-box;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--card);
-  font: 400 16px/1.5 var(--sans);
-  color: var(--ink);
-  resize: vertical;
+.notes-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+.tb-button {
+  min-width: 44px; min-height: 44px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  font: 600 16px var(--sans); color: var(--ink); cursor: pointer;
 }
-.notes-box:focus { outline: 3px solid var(--accent); outline-offset: 1px; }
+.tb-button.on { background: var(--accent-soft); border-color: var(--accent); color: #1e3e35; }
+.tb-button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.tb-italic { font-style: italic; font-weight: 500; }
+.tb-strike { text-decoration: line-through; }
+.notes-editor {
+  min-height: 55vh; box-sizing: border-box; padding: 14px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--card);
+  font: 400 16px/1.5 var(--sans); color: var(--ink); overflow-wrap: anywhere;
+}
+.notes-editor:focus { outline: 3px solid var(--accent); outline-offset: 1px; }
+.notes-editor p { margin: 0 0 6px; }
+.notes-editor ul, .notes-editor ol { margin: 0 0 6px; padding-left: 24px; }
+.notes-editor li > p { margin: 0; }
+/* Checklist: a box, and the text is struck through once it's ticked. */
+.notes-editor ul[data-type='taskList'] { list-style: none; padding-left: 0; }
+.notes-editor ul[data-type='taskList'] li { display: flex; align-items: flex-start; gap: 10px; min-height: 32px; }
+.notes-editor ul[data-type='taskList'] li > label { flex: 0 0 auto; padding-top: 5px; user-select: none; }
+.notes-editor ul[data-type='taskList'] li > label input { width: 20px; height: 20px; accent-color: var(--accent); }
+.notes-editor ul[data-type='taskList'] li > div { flex: 1; min-width: 0; padding-top: 2px; }
+.notes-editor ul[data-type='taskList'] li[data-checked='true'] > div { text-decoration: line-through; color: var(--muted); }
 .notes-status { margin: 8px 2px 0; font-size: 13px; }
 
 /* Income split: per-account totals */
