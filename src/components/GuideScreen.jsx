@@ -175,7 +175,8 @@ export default function GuideScreen() {
 
         <Section title="Bills">
           <ul>
-            <li>Save the bills you pay regularly once: Budget → Bills (or Setup → Bills) → + Add a bill. Each has a name, its usual amount, the budget item it comes from, what pays it (the bank account or a card) and, if you like, the day it’s due.</li>
+            <li>Fastest setup: Bills → <strong>Set up bills</strong>. Every budget item is listed by account, like income splits; type the usual amount next to each one that’s a bill, pick Debit or a card and a due day if you like, then Save. Clearing an amount removes that bill.</li>
+            <li>Or add one at a time: Budget → Bills (or Setup → Bills) → + Add a bill. Each has a name, its usual amount, the budget item it comes from, what pays it (the bank account or a card) and, if you like, the day it’s due.</li>
             <li>When bills go out, tick them. Tick one or several, change “This time” if a bill came in different, check the date, then tap Log. Each one becomes an ordinary spend; a bill paid by card works like a card spend.</li>
             <li>The panel shows whether each budget item has enough before you log. Undo on the message takes the whole batch back.</li>
             <li>Bills are sorted by due day. A bill logged this month shows <span className="match-ok">Paid</span> with the date, so you don’t log it twice.</li>

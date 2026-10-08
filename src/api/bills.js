@@ -72,3 +72,28 @@ export async function unpayBills({ ids = [], pairs = [] }) {
     if (error) throw error
   }
 }
+
+// Save the "Set up bills" grid in one go.
+//   inserts: [{ name, categoryId, amount, cardId, dueDay, sortOrder }]
+//   updates: [{ id, name, categoryId, amount, cardId, dueDay }]
+//   deleteIds: bills whose amount was cleared (their past spends stay)
+export async function saveBillsBulk({ inserts = [], updates = [], deleteIds = [] }) {
+  if (inserts.length) {
+    const { error } = await supabase.from('bills').insert(
+      inserts.map((b) => ({
+        name: b.name.trim(),
+        category_id: b.categoryId,
+        amount: b.amount,
+        card_id: b.cardId || null,
+        due_day: b.dueDay || null,
+        sort_order: b.sortOrder,
+      })),
+    )
+    if (error) throw error
+  }
+  for (const b of updates) await updateBill(b.id, b)
+  if (deleteIds.length) {
+    const { error } = await supabase.from('bills').delete().in('id', deleteIds)
+    if (error) throw error
+  }
+}

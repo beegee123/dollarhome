@@ -1059,3 +1059,11 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
   font: 500 16px var(--mono);
 }
 .bill-date { flex-direction: row; align-items: center; gap: 10px; }
+.bills-setup-button { align-self: flex-start; margin: 0 0 12px; }
+.split-groups { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.bill-setup-item { border-top: 1px solid #ecece6; }
+.split-group .section-title + .bill-setup-item { border-top: 0; }
+.bill-setup-item .split-line { border-top: 0; }
+.bill-setup-extra { display: flex; gap: 8px; justify-content: flex-end; padding: 0 0 10px; }
+.bill-setup-extra .field-select { height: 38px; font-size: 14px; }
+.bills-total { margin-bottom: 4px; }

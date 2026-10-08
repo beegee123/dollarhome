@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchBudget } from '../api/budget.js'
-import { addBill, deleteBill, fetchBills, payBills, unpayBills, updateBill } from '../api/bills.js'
+import { addBill, deleteBill, fetchBills, payBills, saveBillsBulk, unpayBills, updateBill } from '../api/bills.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -16,6 +16,7 @@ export default function BillsScreen() {
   const [selected, setSelected] = useState({}) // bill id → amount text for this time
   const [paidOn, setPaidOn] = useState(todayLocal())
   const [editingId, setEditingId] = useState(null) // a bill id, 'new', or null
+  const [setupOpen, setSetupOpen] = useState(false) // the all-budget-items grid
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -144,6 +145,28 @@ export default function BillsScreen() {
     }
   }
 
+  if (setupOpen) {
+    return (
+      <BillsSetup
+        banks={banks}
+        cards={cards}
+        bills={bills}
+        busy={busy}
+        error={actionError}
+        onCancel={() => {
+          setActionError(null)
+          setSetupOpen(false)
+        }}
+        onSave={async (changes) => {
+          if (await run(() => saveBillsBulk(changes))) {
+            setSelected({})
+            setSetupOpen(false)
+          }
+        }}
+      />
+    )
+  }
+
   return (
     <div className="screen screen--wishlist">
       <header className="screen-header screen-header--sub">
@@ -155,12 +178,17 @@ export default function BillsScreen() {
       </header>
 
       <p className="muted setup-intro">Tick the bills that went out, check the amounts, then Log. One or several at a time.</p>
+      <button type="button" className="small-button bills-setup-button" onClick={() => setSetupOpen(true)}>
+        Set up bills (all budget items)
+      </button>
 
       {actionError && <p className="notice" role="alert">{actionError}</p>}
 
       <main className="wish-list">
         {sorted.length === 0 && editingId !== 'new' && (
-          <p className="empty">No bills yet. Add the ones you pay regularly, like phone, insurance or streaming.</p>
+          <p className="empty">
+            No bills yet. Tap <strong>Set up bills</strong> to type amounts next to your budget items, or add one at a time below.
+          </p>
         )}
 
         {sorted.map((b) => {
@@ -309,6 +337,181 @@ export default function BillsScreen() {
   )
 }
 
+// Set up bills: every budget item (bank accounts only), grouped like the income split
+// editor. Type an amount next to each item that's a bill; clear it to remove the bill.
+// The bill takes the item's name. Paid with and Due day show once a row has an amount.
+function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
+  // One bill per budget item here; extra bills on the same item are left as they are.
+  const firstByItem = {}
+  bills.forEach((b) => (firstByItem[b.category_id] ??= b))
+  const extraCount = bills.length - Object.keys(firstByItem).length
+
+  const [rows, setRows] = useState(() => {
+    const init = {}
+    Object.values(firstByItem).forEach((b) => {
+      init[b.category_id] = { amount: String(b.amount), cardId: b.card_id ?? '', dueDay: b.due_day ? String(b.due_day) : '' }
+    })
+    return init
+  })
+  const [localError, setLocalError] = useState(null)
+
+  const set = (itemId, field, value) =>
+    setRows((r) => ({ ...r, [itemId]: { amount: '', cardId: '', dueDay: '', ...r[itemId], [field]: value } }))
+
+  // Card payment envelopes are paid with Pay card, so they're not bills.
+  const paymentEnvelopes = new Set(Object.values(cards).map((c) => c.payment_category_id))
+  const groups = banks.flatMap((b) =>
+    b.accounts
+      .filter((a) => a.kind !== 'credit')
+      .map((a) => ({ bank: b, account: { ...a, items: a.items.filter((i) => !paymentEnvelopes.has(i.id)) } })),
+  )
+  const sumFor = (account) =>
+    account.items.reduce((sum, i) => sum + (parseAmount(rows[i.id]?.amount ?? '') ?? 0), 0)
+  const totals = {}
+  groups.forEach(({ bank, account }) => (totals[bank.currency] = (totals[bank.currency] ?? 0) + sumFor(account)))
+  const totalText = Object.entries(totals)
+    .filter(([, n]) => n > 0)
+    .map(([c, n]) => formatMoney(n, c))
+    .join(' + ')
+
+  function save() {
+    const inserts = []
+    const updates = []
+    const deleteIds = []
+    let bad = null
+    let order = Math.max(-1, ...bills.map((b) => b.sort_order)) + 1
+    groups.forEach(({ account }) =>
+      account.items.forEach((item) => {
+        const row = rows[item.id]
+        const text = row?.amount?.trim() ?? ''
+        const existing = firstByItem[item.id]
+        if (text === '') {
+          if (existing) deleteIds.push(existing.id)
+          return
+        }
+        const amount = parseAmount(text)
+        if (!amount) {
+          bad ??= item.name
+          return
+        }
+        const fields = { categoryId: item.id, amount, cardId: row.cardId || '', dueDay: row.dueDay ? Number(row.dueDay) : null }
+        if (!existing) inserts.push({ ...fields, name: item.name, sortOrder: order++ })
+        else if (
+          existing.amount !== amount ||
+          (existing.card_id ?? '') !== fields.cardId ||
+          (existing.due_day ?? null) !== fields.dueDay
+        )
+          updates.push({ ...fields, id: existing.id, name: existing.name })
+      }),
+    )
+    if (bad) return setLocalError(`Check the amount for ${bad}.`)
+    setLocalError(null)
+    onSave({ inserts, updates, deleteIds })
+  }
+
+  return (
+    <div className="screen">
+      <header className="screen-header screen-header--sub">
+        <button type="button" className="back-link link-button" onClick={onCancel}>
+          ← Bills
+        </button>
+        <span className="eyebrow">DOLLARHOME</span>
+        <h1>Set up bills</h1>
+      </header>
+      <p className="muted setup-intro">
+        Type the usual amount next to each budget item that’s a bill. Leave the rest blank. Clearing an amount removes that bill.
+      </p>
+      {extraCount > 0 && (
+        <p className="hint">
+          {extraCount} more {extraCount === 1 ? 'bill shares' : 'bills share'} a budget item with another bill; edit {extraCount === 1 ? 'it' : 'them'} on the Bills screen.
+        </p>
+      )}
+
+      <div className="split-groups">
+        {groups.map(({ bank, account }) => {
+          const cardChoices = Object.values(cards).filter((c) => c.currency === bank.currency)
+          const sum = sumFor(account)
+          return (
+            <section key={account.id} className="split-group">
+              <h2 className="section-title section-title--split">
+                <span>
+                  {bank.name} · {account.name}
+                </span>
+                <span className="split-sum">{sum > 0 ? formatMoney(sum, bank.currency) : ''}</span>
+              </h2>
+              {account.items.length === 0 && <p className="muted empty--small">No budget items in this account.</p>}
+              {account.items.map((item) => {
+                const row = rows[item.id]
+                const has = (row?.amount ?? '').trim() !== ''
+                return (
+                  <div key={item.id} className="bill-setup-item">
+                    <label className="split-line">
+                      <span>{item.name}</span>
+                      <span className="split-input">
+                        <span className="muted">{bank.currency === 'CAD' ? 'C$' : '$'}</span>
+                        <input
+                          inputMode="decimal"
+                          placeholder="—"
+                          aria-label={`${item.name} bill amount`}
+                          value={row?.amount ?? ''}
+                          onChange={(e) => set(item.id, 'amount', e.target.value)}
+                        />
+                      </span>
+                    </label>
+                    {has && (
+                      <div className="bill-setup-extra">
+                        {cardChoices.length > 0 && (
+                          <select
+                            className="field-select"
+                            aria-label={`${item.name} paid with`}
+                            value={row.cardId}
+                            onChange={(e) => set(item.id, 'cardId', e.target.value)}
+                          >
+                            <option value="">Debit</option>
+                            {cardChoices.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <select
+                          className="field-select"
+                          aria-label={`${item.name} due day`}
+                          value={row.dueDay}
+                          onChange={(e) => set(item.id, 'dueDay', e.target.value)}
+                        >
+                          <option value="">No due day</option>
+                          {Array.from({ length: 31 }, (_, n) => n + 1).map((d) => (
+                            <option key={d} value={d}>
+                              Due {ordinal(d)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </section>
+          )
+        })}
+      </div>
+
+      {(localError || error) && <p className="notice" role="alert">{localError || error}</p>}
+      <p className="split-total bills-total">Bills total: {totalText || '—'}</p>
+      <div className="sheet-actions">
+        <button type="button" className="secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="button" className="primary" disabled={busy} onClick={save}>
+          {busy ? 'Saving…' : 'Save bills'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // Add or edit one bill: name, amount, budget item, paid with, due day.
 function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
   const [name, setName] = useState(initial?.name ?? '')
@@ -318,7 +521,8 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
   const [dueDay, setDueDay] = useState(initial?.due_day ? String(initial.due_day) : '')
   const [error, setError] = useState(null)
 
-  // Only budget items in bank accounts (not cards), and not Unassigned.
+  // Only budget items in bank accounts (not cards), not Unassigned, not card payment envelopes.
+  const paymentEnvelopes = new Set(Object.values(cards).map((c) => c.payment_category_id))
   const itemBank = banks.find((b) => b.accounts.some((a) => a.items.some((i) => i.id === categoryId)))
   const cardChoices = Object.values(cards).filter((c) => itemBank && c.currency === itemBank.currency)
 
@@ -354,7 +558,7 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
             b.accounts
               .filter((a) => a.kind !== 'credit')
               .map((a) => {
-                const items = a.items.filter((i) => !i.is_unassigned)
+                const items = a.items.filter((i) => !i.is_unassigned && !paymentEnvelopes.has(i.id))
                 return items.length === 0 ? null : (
                   <optgroup key={a.id} label={`${b.name} · ${a.name} (${b.currency})`}>
                     {items.map((i) => (
