@@ -97,3 +97,29 @@ export async function saveBillsBulk({ inserts = [], updates = [], deleteIds = []
     if (error) throw error
   }
 }
+
+// The bills that come from one budget item (for pre-filling Quick spend), with last paid.
+export async function fetchBillsForItem(categoryId) {
+  const [bills, paid] = await Promise.all([
+    supabase.from('bills').select('id, name, amount, card_id, due_day').eq('category_id', categoryId).order('sort_order').order('name'),
+    supabase
+      .from('transactions')
+      .select('bill_id, occurred_on')
+      .eq('category_id', categoryId)
+      .eq('kind', 'spend')
+      .not('bill_id', 'is', null)
+      .order('occurred_on', { ascending: false })
+      .limit(200),
+  ])
+  if (bills.error) throw bills.error
+  if (paid.error) throw paid.error
+  const lastPaid = {}
+  for (const t of paid.data) lastPaid[t.bill_id] ??= t.occurred_on
+  return bills.data.map((b) => ({ ...b, amount: Number(b.amount), lastPaid: lastPaid[b.id] ?? null }))
+}
+
+// Tag a card spend (all its rows) with the bill it paid.
+export async function tagPairWithBill(pairId, billId) {
+  const { error } = await supabase.from('transactions').update({ bill_id: billId }).eq('pair_id', pairId)
+  if (error) throw error
+}

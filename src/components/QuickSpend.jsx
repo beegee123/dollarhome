@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { deletePairs, deleteTransaction, fetchRecent } from '../api/transactions.js'
+import { fetchBillsForItem } from '../api/bills.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
 
 const KIND_LABELS = { income: 'Income', spend: 'Spent', move: 'Moved', transfer: 'Transfer', opening: 'Starting balance' }
@@ -24,6 +25,40 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
   const [cardId, setCardId] = useState('') // '' = paid from the bank account (debit/cash)
   const [recentError, setRecentError] = useState(null)
   const amountRef = useRef(null)
+  const [bills, setBills] = useState([]) // bills that come from this item (Bills screen)
+  const [billId, setBillId] = useState(null) // the bill this spend pays, if any
+  const typed = useRef(false) // once you type, a late-loading bill won't overwrite it
+
+  // Fill the form from a bill: its amount, its name as the note, its card.
+  function applyBill(bill) {
+    if (!bill) {
+      setBillId(null)
+      setAmountText('')
+      setNote('')
+      setCardId('')
+      return
+    }
+    setBillId(bill.id)
+    setAmountText(String(bill.amount))
+    setNote(bill.name)
+    setCardId(bill.card_id && cards.some((c) => c.id === bill.card_id) ? bill.card_id : '')
+    requestAnimationFrame(() => amountRef.current?.select())
+  }
+
+  // If this item has bills, pre-fill from the first one, so Log spend is all that's left.
+  useEffect(() => {
+    let ignore = false
+    fetchBillsForItem(item.id)
+      .then((list) => {
+        if (ignore || list.length === 0) return
+        setBills(list)
+        if (!typed.current) applyBill(list[0])
+      })
+      .catch(() => {}) // no bills table yet, or offline: just a normal spend
+    return () => {
+      ignore = true
+    }
+  }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Put the cursor in the amount box right away, so you can just type.
   useEffect(() => amountRef.current?.focus(), [])
@@ -58,7 +93,7 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
     setBusy(true)
     setError(null)
     try {
-      await onSave({ amount, note, occurredOn, cardId: cardId || null })
+      await onSave({ amount, note, occurredOn, cardId: cardId || null, billId })
       // On success the screen closes this panel.
     } catch {
       setError('Couldn’t save. Check your connection and try again.')
@@ -94,9 +129,35 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
               autoComplete="off"
               placeholder={currency === 'CAD' ? 'C$0.00' : '$0.00'}
               value={amountText}
-              onChange={(e) => setAmountText(e.target.value)}
+              onChange={(e) => {
+                typed.current = true
+                setAmountText(e.target.value)
+              }}
             />
           </label>
+
+          {/* Bills from this item: pick which one this pays (or none). */}
+          {bills.length > 0 && (
+            <fieldset className="chips">
+              <legend>Bill</legend>
+              {bills.map((b) => (
+                <label key={b.id} className={billId === b.id ? 'on' : ''}>
+                  <input type="radio" name="bill" checked={billId === b.id} onChange={() => applyBill(b)} />
+                  {b.name}
+                </label>
+              ))}
+              <label className={billId === null ? 'on' : ''}>
+                <input type="radio" name="bill" checked={billId === null} onChange={() => applyBill(null)} />
+                Not a bill
+              </label>
+            </fieldset>
+          )}
+          {(() => {
+            const b = bills.find((x) => x.id === billId)
+            return b?.lastPaid && b.lastPaid.slice(0, 7) === todayLocal().slice(0, 7) ? (
+              <p className="hint match-off">{b.name} was already logged on {shortDate(b.lastPaid)} this month.</p>
+            ) : null
+          })()}
 
           <div className="spend-row">
             <label className="field">

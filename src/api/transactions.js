@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase.js'
 
 // Log money spent from one budget item. Spending is stored as a NEGATIVE amount,
 // so a balance is always just "add up the transactions".
-export async function logSpend({ categoryId, amount, note, occurredOn }) {
+export async function logSpend({ categoryId, amount, note, occurredOn, billId = null }) {
   const { data, error } = await supabase
     .from('transactions')
     .insert({
@@ -12,6 +12,7 @@ export async function logSpend({ categoryId, amount, note, occurredOn }) {
       kind: 'spend',
       note: note?.trim() || null,
       occurred_on: occurredOn,
+      ...(billId ? { bill_id: billId } : {}), // marks the bill Paid on the Bills screen
     })
     .select('id')
     .single()

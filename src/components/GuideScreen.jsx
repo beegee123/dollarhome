@@ -180,6 +180,7 @@ export default function GuideScreen() {
             <li>When bills go out, tick them. Tick one or several, change “This time” if a bill came in different, check the date, then tap Log. Each one becomes an ordinary spend; a bill paid by card works like a card spend.</li>
             <li>The panel shows whether each budget item has enough before you log. Undo on the message takes the whole batch back.</li>
             <li>Bills are sorted by due day. A bill logged this month shows <span className="match-ok">Paid</span> with the date, so you don’t log it twice.</li>
+            <li>Paying one bill from Budget: tap its budget item. The spend panel opens filled in from the bill (amount, name, card), so just tap Log spend. If the item has several bills, pick which one; choose “Not a bill” for an ordinary spend. It warns you if that bill was already logged this month.</li>
             <li>Deleting a bill keeps its past spends in your history.</li>
           </ul>
         </Section>

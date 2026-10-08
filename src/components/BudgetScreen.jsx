@@ -14,6 +14,7 @@ import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMon
 import { adjustToBank, setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { cardSpend, payCard } from '../api/cards.js'
+import { tagPairWithBill } from '../api/bills.js'
 import { formatMoney, normalize, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -108,12 +109,13 @@ export default function BudgetScreen() {
 
   // Save first, THEN change the screen: a spend is money, so the bar should
   // only move once the database has it.
-  async function saveSpend({ amount, note, occurredOn, cardId }) {
+  async function saveSpend({ amount, note, occurredOn, cardId, billId }) {
     const { item, currency } = spending
     if (cardId) {
       // Paid with a card: the item drops, the card's payment envelope rises, the card owes more.
       const card = banks.flatMap((b) => b.accounts).find((a) => a.id === cardId)
       const pairId = await cardSpend({ categoryId: item.id, cardId, amount, spentOn: occurredOn, note })
+      if (billId) await tagPairWithBill(pairId, billId).catch(() => {}) // only affects the Paid label
       setSpending(null)
       setReloadCount((n) => n + 1)
       showToast(`Logged ${formatMoney(amount, currency)} from ${item.name} on ${card?.name ?? 'card'}`, () =>
@@ -121,7 +123,7 @@ export default function BudgetScreen() {
       )
       return
     }
-    const id = await logSpend({ categoryId: item.id, amount, note, occurredOn }) // throws on failure; QuickSpend shows it
+    const id = await logSpend({ categoryId: item.id, amount, note, occurredOn, billId }) // throws on failure; QuickSpend shows it
     adjustBalance(item.id, -amount)
     setSpending(null)
     showToast(`Logged ${formatMoney(amount, currency)} from ${item.name}`, async () => {
