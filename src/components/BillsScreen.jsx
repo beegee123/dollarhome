@@ -365,6 +365,11 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
       .filter((a) => a.kind !== 'credit')
       .map((a) => ({ bank: b, account: { ...a, items: a.items.filter((i) => !paymentEnvelopes.has(i.id)) } })),
   )
+  // Bank tabs, like Budget: one bank's accounts at a time. Amounts typed on other tabs are kept.
+  const tabBanks = banks.filter((b) => groups.some((g) => g.bank.id === b.id))
+  const [bankId, setBankId] = useState(tabBanks[0]?.id ?? null)
+  const shown = groups.filter((g) => g.bank.id === bankId)
+
   const sumFor = (account) =>
     account.items.reduce((sum, i) => sum + (parseAmount(rows[i.id]?.amount ?? '') ?? 0), 0)
   const totals = {}
@@ -427,8 +432,29 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
         </p>
       )}
 
+      {tabBanks.length > 1 && (
+        <div className="bank-tabs" role="tablist" aria-label="Banks">
+          {tabBanks.map((b) => {
+            const sum = groups.filter((g) => g.bank.id === b.id).reduce((n, g) => n + sumFor(g.account), 0)
+            return (
+              <button
+                key={b.id}
+                type="button"
+                role="tab"
+                aria-selected={b.id === bankId}
+                className="bank-tab"
+                onClick={() => setBankId(b.id)}
+              >
+                {b.name}
+                {sum > 0 && <span className="bank-tab-sum"> · {formatMoney(sum, b.currency)}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <div className="split-groups">
-        {groups.map(({ bank, account }) => {
+        {shown.map(({ bank, account }) => {
           const cardChoices = Object.values(cards).filter((c) => c.currency === bank.currency)
           const sum = sumFor(account)
           return (

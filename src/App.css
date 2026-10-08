@@ -1067,3 +1067,4 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bill-setup-extra { display: flex; gap: 8px; justify-content: flex-end; padding: 0 0 10px; }
 .bill-setup-extra .field-select { height: 38px; font-size: 14px; }
 .bills-total { margin-bottom: 4px; }
+.bank-tab-sum { font-weight: 400; opacity: 0.8; }
