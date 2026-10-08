@@ -350,6 +350,9 @@ export default function BudgetScreen() {
           <button type="button" className="secondary bottom-bar-side" onClick={() => setMoveFrom(null)}>
             Move
           </button>
+          <Link to="/bills" className="secondary bottom-bar-side bottom-bar-link">
+            Bills
+          </Link>
           <button type="button" className="primary bottom-bar-button" onClick={() => setIncomeOpen(true)}>
             + Income in
           </button>

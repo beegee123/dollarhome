@@ -93,6 +93,13 @@ export default function SetupScreen() {
         </span>
         <span aria-hidden="true">›</span>
       </Link>
+      <Link to="/bills" className="setup-link">
+        <span>
+          <strong>Bills</strong>
+          <span className="muted"> · regular bills, logged in one go</span>
+        </span>
+        <span aria-hidden="true">›</span>
+      </Link>
       <Link to="/setup/notes" className="setup-link">
         <span>
           <strong>Bill notes</strong>
