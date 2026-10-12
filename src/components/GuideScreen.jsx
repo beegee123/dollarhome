@@ -190,6 +190,7 @@ export default function GuideScreen() {
             <li>Add an item, its price, and the envelope it will come from.</li>
             <li>Tap items to select them: each envelope shows Enough or Short, then Ready or Not yet.</li>
             <li>Mark bought turns them into spends from their envelopes. Put back undoes it.</li>
+            <li>Each envelope with wishlist items gets its own tab, made automatically. A tab shows what the envelope holds against what its items need. Adding an item from a tab picks that envelope for you. Bought items are under All.</li>
           </ol>
         </Section>
 

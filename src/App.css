@@ -1068,3 +1068,18 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bill-setup-extra .field-select { height: 38px; font-size: 14px; }
 .bills-total { margin-bottom: 4px; }
 .bank-tab-sum { font-weight: 400; opacity: 0.8; }
+
+/* ---- Wishlist: envelope tabs ---- */
+.wish-tabs { margin-bottom: 10px; }
+.wish-tab-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 14px;
+}

@@ -18,6 +18,7 @@ export default function WishlistScreen() {
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   const [reloadCount, setReloadCount] = useState(0)
+  const [tab, setTab] = useState('all') // 'all' or an envelope id
   const reload = () => setReloadCount((n) => n + 1)
 
   useEffect(() => {
@@ -84,6 +85,16 @@ export default function WishlistScreen() {
   const bought = wishes.filter((w) => w.bought_at).sort((a, b) => b.bought_at.localeCompare(a.bought_at))
   const chosen = open.filter((w) => selected.has(w.id))
 
+  // One tab per envelope that has items on the wishlist (made automatically).
+  const tabIds = [...new Set(open.map((w) => w.category_id).filter((id) => envelopes[id]))]
+  const tabs = tabIds
+    .map((id) => envelopes[id])
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const activeTab = tab !== 'all' && tabIds.includes(tab) ? tab : 'all'
+  const shown = activeTab === 'all' ? open : open.filter((w) => w.category_id === activeTab)
+  const tabEnv = activeTab === 'all' ? null : envelopes[activeTab]
+  const tabNeed = shown.reduce((sum, w) => sum + w.amount, 0)
+
   // Group the selected items by envelope: what they need vs what the envelope holds.
   const groups = {}
   chosen.forEach((w) => {
@@ -142,10 +153,50 @@ export default function WishlistScreen() {
 
       {actionError && <p className="notice" role="alert">{actionError}</p>}
 
+      {tabs.length > 0 && (
+        <div className="bank-tabs wish-tabs" role="tablist" aria-label="Envelopes">
+          <button type="button" role="tab" aria-selected={activeTab === 'all'} className="bank-tab" onClick={() => setTab('all')}>
+            All
+          </button>
+          {tabs.map((env) => (
+            <button
+              key={env.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === env.id}
+              className="bank-tab"
+              onClick={() => setTab(env.id)}
+            >
+              {env.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* On an envelope's tab: what it holds vs what its items need. */}
+      {tabEnv && (
+        <div className="wish-tab-summary">
+          <span>
+            <strong>{tabEnv.name}</strong>
+            <span className="muted"> · {tabEnv.bankName} {tabEnv.accountName}</span>
+          </span>
+          <span>
+            <span className="money">
+              {formatMoney(tabNeed, tabEnv.currency)} of {formatMoney(tabEnv.balance, tabEnv.currency)}
+            </span>
+            {tabEnv.balance >= tabNeed ? (
+              <strong className="match-ok"> Enough for all</strong>
+            ) : (
+              <strong className="match-off"> Short {formatMoney(tabNeed - tabEnv.balance, tabEnv.currency)}</strong>
+            )}
+          </span>
+        </div>
+      )}
+
       <main className="wish-list">
         {open.length === 0 && editingId !== 'new' && <p className="empty">Nothing on your wishlist yet.</p>}
 
-        {open.map((w) => {
+        {shown.map((w) => {
           const env = envelopes[w.category_id]
           if (editingId === w.id) {
             return (
@@ -194,6 +245,7 @@ export default function WishlistScreen() {
           <WishForm
             banks={banks}
             initial={null}
+            defaultCategoryId={activeTab === 'all' ? '' : activeTab}
             busy={busy}
             onCancel={() => setEditingId(null)}
             onSave={async (fields) =>
@@ -208,7 +260,7 @@ export default function WishlistScreen() {
           </button>
         )}
 
-        {bought.length > 0 && (
+        {activeTab === 'all' && bought.length > 0 && (
           <details className="archived">
             <summary>Bought ({bought.length})</summary>
             {bought.map((w) => (
@@ -295,10 +347,10 @@ export default function WishlistScreen() {
 }
 
 // Add or edit one wishlist item: name, amount, envelope, note.
-function WishForm({ banks, initial, busy, onSave, onCancel, onDelete }) {
+function WishForm({ banks, initial, defaultCategoryId = '', busy, onSave, onCancel, onDelete }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [amountText, setAmountText] = useState(initial ? String(initial.amount) : '')
-  const [categoryId, setCategoryId] = useState(initial?.category_id ?? '')
+  const [categoryId, setCategoryId] = useState(initial?.category_id ?? defaultCategoryId)
   const [note, setNote] = useState(initial?.note ?? '')
   const [error, setError] = useState(null)
 
