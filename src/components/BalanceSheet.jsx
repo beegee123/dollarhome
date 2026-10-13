@@ -18,6 +18,7 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
   const [moves, setMoves] = useState([])
+  const [activity, setActivity] = useState([]) // spends and income since the last update
   const [movesInfo, setMovesInfo] = useState({ state: 'loading' })
   const [ticked, setTicked] = useState({})
   const startBalance = useRef(Number(account.bank_balance) || 0)
@@ -30,6 +31,7 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
       .then((r) => {
         if (!live) return
         setMoves(r.list)
+        setActivity(r.activity ?? [])
         setMovesInfo({ state: 'ok', since: r.since, hadCheck: r.hadCheck })
       })
       .catch((e) => live && setMovesInfo({ state: 'error', message: e?.message || String(e) }))
@@ -37,9 +39,9 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
   }, [account.id, isCard])
 
   function toggleMove(m) {
-    const next = { ...ticked, [m.pairId]: !ticked[m.pairId] }
+    const next = { ...ticked, [m.key]: !ticked[m.key] }
     setTicked(next)
-    const sum = moves.reduce((acc, x) => acc + (next[x.pairId] ? x.net : 0), 0)
+    const sum = [...moves, ...activity].reduce((acc, x) => acc + (next[x.key] ? x.net : 0), 0)
     setText(String(Math.round((startBalance.current + sum) * 100) / 100))
   }
 
@@ -116,20 +118,34 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
           {!isCard && movesInfo.state === 'error' && (
             <p className="hint">Couldn’t load recent moves: {movesInfo.message}</p>
           )}
-          {!isCard && movesInfo.state === 'ok' && moves.length === 0 && (
+          {!isCard && movesInfo.state === 'ok' && moves.length === 0 && activity.length === 0 && (
             <p className="hint">
-              No moves to tick since {movesInfo.hadCheck ? 'you last updated this balance' : 'the last 14 days'} ({shortDate(movesInfo.since.slice(0, 10))}).
+              Nothing to tick since {movesInfo.hadCheck ? 'you last updated this balance' : 'the last 14 days'} ({shortDate(movesInfo.since.slice(0, 10))}).
             </p>
+          )}
+          {!isCard && (moves.length > 0 || activity.length > 0) && (
+            <p className="hint">Tick what your bank has already taken in or paid out. Each tick adds or subtracts it from your last balance.</p>
           )}
           {!isCard && moves.length > 0 && (
             <fieldset className="moves-box">
               <legend className="field-label">Moved since you last updated</legend>
-              <p className="hint">Tick a move to add or subtract it from your last balance.</p>
               {moves.map((m) => (
-                <label key={m.pairId} className="move-row">
-                  <input type="checkbox" checked={!!ticked[m.pairId]} onChange={() => toggleMove(m)} />
+                <label key={m.key} className="move-row">
+                  <input type="checkbox" checked={!!ticked[m.key]} onChange={() => toggleMove(m)} />
                   <span>{shortDate(m.date)} · {m.label}</span>
                   <span className="money">{m.net > 0 ? '+' : '−'}{formatMoney(Math.abs(m.net), currency)}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {!isCard && activity.length > 0 && (
+            <fieldset className="moves-box">
+              <legend className="field-label">Spent and received since you last updated</legend>
+              {activity.map((m) => (
+                <label key={m.key} className="move-row">
+                  <input type="checkbox" checked={!!ticked[m.key]} onChange={() => toggleMove(m)} />
+                  <span>{shortDate(m.date)} · {m.label}</span>
+                  <span className={`money ${m.net > 0 ? 'money-in' : ''}`}>{m.net > 0 ? '+' : '−'}{formatMoney(Math.abs(m.net), currency)}</span>
                 </label>
               ))}
             </fieldset>
@@ -148,10 +164,10 @@ export default function BalanceSheet({ account, currency, onSave, onAdjust, onCl
             )}
           </p>
           {!isCard && diff !== null && diff < 0 && (
-            <p className="hint">Less in the bank usually means a spend you haven’t logged yet.</p>
+            <p className="hint">Less in the bank usually means a spend you haven’t logged yet, or income that hasn’t arrived.</p>
           )}
           {!isCard && diff !== null && diff > 0 && (
-            <p className="hint">More in the bank usually means income you haven’t added yet.</p>
+            <p className="hint">More in the bank usually means income you haven’t added yet, or a spend the bank hasn’t taken out yet.</p>
           )}
           {isCard && diff !== null && diff > 0 && (
             <p className="hint">Owing more usually means a card purchase you haven’t logged, or interest.</p>

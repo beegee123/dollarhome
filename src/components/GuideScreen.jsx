@@ -116,7 +116,7 @@ export default function GuideScreen() {
             <li>Tap it and type what your bank app shows. Less in the bank usually means an unlogged spend; more, unlogged income.</li>
             <li>
               If you moved money since your last update, the sheet lists those moves with tick boxes. Tick one to add or
-              subtract exactly that amount from your last balance, so you don’t have to type it. You can still edit the number.
+              subtract exactly that amount from your last balance, so you don’t have to type it. A second list shows spends and paychecks logged since then; tick the ones your bank has already taken or received. Card purchases aren’t listed, because the bank only sees the card payment. You can still edit the number.
             </li>
             <li>Save balance only records the bank’s number; it never moves money between items.</li>
             <li>

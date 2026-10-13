@@ -146,6 +146,7 @@ export async function fetchMovesSinceCheck(accountId) {
     .filter((p) => p.net !== 0)
     .sort((a, b) => (a.created < b.created ? 1 : -1))
     .map((p) => ({
+      key: p.pairId,
       pairId: p.pairId,
       net: p.net,
       date: p.date,
@@ -155,5 +156,59 @@ export async function fetchMovesSinceCheck(accountId) {
           ? `${p.net > 0 ? 'From' : 'To'} ${[...p.others].join(', ')}`
           : 'Move',
     }))
-  return { since, hadCheck: !!acct.balance_checked_at, list }
+
+  const activity = await fetchActivitySince(accountId, since)
+  return { since, hadCheck: !!acct.balance_checked_at, list, activity }
+}
+
+// Spends and income logged in one account since a time (not moves: those are above).
+// Each paycheck is one row (its lines added up); each spend is its own row.
+async function fetchActivitySince(accountId, since) {
+  const { data: cats, error: e1 } = await supabase.from('categories').select('id, name').eq('account_id', accountId)
+  if (e1) throw e1
+  if (!cats.length) return []
+  const catName = new Map(cats.map((c) => [c.id, c.name]))
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('id, amount, kind, note, occurred_on, created_at, category_id, income_event_id')
+    .in('category_id', cats.map((c) => c.id))
+    .in('kind', ['spend', 'income'])
+    .is('pair_id', null)
+    .gt('created_at', since)
+  if (error) throw error
+
+  // Paycheck names, if any income came in.
+  const eventIds = [...new Set(data.filter((t) => t.income_event_id).map((t) => t.income_event_id))]
+  const eventName = new Map()
+  if (eventIds.length) {
+    const { data: events } = await supabase
+      .from('income_events')
+      .select('id, note, source:income_sources (name)')
+      .in('id', eventIds)
+    for (const ev of events ?? []) eventName.set(ev.id, ev.source?.name || ev.note || 'Income')
+  }
+
+  const rows = new Map()
+  for (const t of data) {
+    const key = t.kind === 'income' && t.income_event_id ? `e:${t.income_event_id}` : `t:${t.id}`
+    const row =
+      rows.get(key) ??
+      {
+        key,
+        net: 0,
+        date: t.occurred_on,
+        created: t.created_at,
+        label:
+          t.kind === 'income'
+            ? `In · ${eventName.get(t.income_event_id) ?? t.note ?? 'Income'}`
+            : `Spent · ${t.note || catName.get(t.category_id) || 'spend'}`,
+      }
+    row.net += Number(t.amount)
+    rows.set(key, row)
+  }
+  return [...rows.values()]
+    .map((r) => ({ ...r, net: Math.round(r.net * 100) / 100 }))
+    .filter((r) => r.net !== 0)
+    .sort((a, b) => (a.created < b.created ? 1 : -1))
 }
