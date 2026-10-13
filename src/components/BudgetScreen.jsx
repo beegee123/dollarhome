@@ -15,7 +15,7 @@ import { adjustToBank, setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { cardSpend, payCard } from '../api/cards.js'
 import { tagPairWithBill } from '../api/bills.js'
-import { formatMoney, normalize, todayLocal } from '../lib/money.js'
+import { formatMoney, normalize, shortDate, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // The home screen: bank tabs → account sections → budget items.
@@ -65,7 +65,7 @@ export default function BudgetScreen() {
         if (reached) setCelebrating(reached)
 
         // Open the first tab, unless the open one still exists.
-        setBankId((current) => (data.some((b) => b.id === current) ? current : data[0]?.id ?? null))
+        setBankId((current) => (current === 'summary' || data.some((b) => b.id === current) ? current : data[0]?.id ?? null))
       })
       .catch((err) => {
         if (!ignore) setLoadError(friendlyError(err))
@@ -229,6 +229,7 @@ export default function BudgetScreen() {
 
   const search = normalize(query)
   const bank = banks.find((b) => b.id === bankId)
+  const showSummary = !search && bankId === 'summary' // the Summary tab: every account, every bank
 
   // Which sections to show:
   //  - no search: every account in the open bank
@@ -292,6 +293,18 @@ export default function BudgetScreen() {
                 {b.name}
               </button>
             ))}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showSummary}
+              className="bank-tab"
+              onClick={() => {
+                setBankId('summary')
+                setQuery('')
+              }}
+            >
+              Summary
+            </button>
           </div>
 
           <SearchBox value={query} onChange={setQuery} />
@@ -299,7 +312,11 @@ export default function BudgetScreen() {
           <p className="bank-line muted">
             {search
               ? 'Results across all banks'
-              : `${bank.name} · ${bank.currency} · total ${formatMoney(
+              : showSummary
+                ? 'Every account at a glance · tap one to update its balance'
+                : !bank
+                  ? ''
+                  : `${bank.name} · ${bank.currency} · total ${formatMoney(
                   bank.accounts.reduce((sum, a) => sum + a.total, 0),
                   bank.currency,
                 )}`}
@@ -318,6 +335,10 @@ export default function BudgetScreen() {
               </button>
             </div>
           ))}
+
+          {showSummary && (
+            <SummaryView banks={banks} onUpdateBalance={(account, b) => setBalanceFor({ account, currency: b.currency })} />
+          )}
 
           <main className="account-list">
             {search && sections.length === 0 && <p className="empty">No budget items match “{query.trim()}”.</p>}
@@ -502,6 +523,60 @@ function AccountSection({ bank, account, title, items, searching, onTapItem, onU
         <BudgetRow key={item.id} item={item} currency={bank.currency} onTap={() => onTapItem(item)} />
       ))}
     </section>
+  )
+}
+
+// The Summary tab: each bank's accounts with what DollarHome holds and the bank balance you
+// last saved, so you can hold it up against your bank's account summary page.
+function SummaryView({ banks, onUpdateBalance }) {
+  return (
+    <div className="summary-list">
+      {banks.map((b) => {
+        const cash = b.accounts.filter((a) => a.kind !== 'credit')
+        const cashTotal = cash.reduce((n, a) => n + a.total, 0)
+        return (
+          <section key={b.id} className="summary-bank" aria-label={b.name}>
+            <h2 className="section-title section-title--split">
+              <span>
+                {b.name} · {b.currency}
+              </span>
+              <span className="split-sum">{cash.length > 0 ? formatMoney(cashTotal, b.currency) : ''}</span>
+            </h2>
+            {b.accounts.length === 0 && <p className="muted empty--small">No accounts yet.</p>}
+            {b.accounts.map((a) => {
+              const isCard = a.kind === 'credit'
+              const mine = isCard ? a.owed : a.total
+              const off = Math.round((a.bank_balance - mine) * 100) / 100
+              return (
+                <button key={a.id} type="button" className="summary-row" onClick={() => onUpdateBalance(a, b)}>
+                  <span className="summary-name">
+                    <span>
+                      {a.name}
+                      {isCard && <span className="card-badge">CARD</span>}
+                    </span>
+                    <span className="muted summary-sub">
+                      {isCard ? 'Statement' : 'Bank'} {formatMoney(a.bank_balance, b.currency)}
+                      {a.balance_checked_at ? ` · ${shortDate(a.balance_checked_at.slice(0, 10))}` : ''}
+                    </span>
+                  </span>
+                  <span className="summary-right">
+                    <span className="money summary-amount">
+                      {isCard ? 'owes ' : ''}
+                      {formatMoney(mine, b.currency)}
+                    </span>
+                    {off === 0 ? (
+                      <span className="match-ok summary-status">Matches</span>
+                    ) : (
+                      <span className="match-off summary-status">Off {formatMoney(Math.abs(off), b.currency)}</span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+          </section>
+        )
+      })}
+    </div>
   )
 }
 

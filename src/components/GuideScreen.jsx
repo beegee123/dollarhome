@@ -109,6 +109,7 @@ export default function GuideScreen() {
 
         <Section title="Staying in step with your bank">
           <ul>
+            <li>The <strong>Summary</strong> tab, after your bank tabs, lists every account at every bank: what DollarHome holds, the bank balance you last saved and when, and Matches or Off. Hold it up against your bank’s account summary page; tap an account to update it.</li>
             <li>
               Each account shows <span className="match-ok">Matches bank</span> or{' '}
               <span className="match-off">Off by $X vs bank</span>.

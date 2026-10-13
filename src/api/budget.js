@@ -14,7 +14,7 @@ export async function fetchBudget() {
       .order('name'),
     supabase
       .from('accounts')
-      .select('id, bank_id, name, kind, payment_category_id, bank_balance, sort_order')
+      .select('id, bank_id, name, kind, payment_category_id, bank_balance, balance_checked_at, sort_order')
       .eq('archived', false)
       .order('sort_order')
       .order('name'),
