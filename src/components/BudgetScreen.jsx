@@ -15,7 +15,7 @@ import { adjustToBank, setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { cardSpend, payCard } from '../api/cards.js'
 import { tagPairWithBill } from '../api/bills.js'
-import { formatMoney, normalize, shortDate, todayLocal } from '../lib/money.js'
+import { formatMoney, normalize, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // The home screen: bank tabs → account sections → budget items.
@@ -313,7 +313,7 @@ export default function BudgetScreen() {
             {search
               ? 'Results across all banks'
               : showSummary
-                ? 'Every account at a glance · tap one to update its balance'
+                ? 'Red means it doesn’t match your bank · tap to check'
                 : !bank
                   ? ''
                   : `${bank.name} · ${bank.currency} · total ${formatMoney(
@@ -548,27 +548,20 @@ function SummaryView({ banks, onUpdateBalance }) {
               const mine = isCard ? a.owed : a.total
               const off = Math.round((a.bank_balance - mine) * 100) / 100
               return (
-                <button key={a.id} type="button" className="summary-row" onClick={() => onUpdateBalance(a, b)}>
+                <button
+                  key={a.id}
+                  type="button"
+                  className="summary-row"
+                  onClick={() => onUpdateBalance(a, b)}
+                  aria-label={`${a.name}: ${formatMoney(mine, b.currency)}${off === 0 ? '' : `, off by ${formatMoney(Math.abs(off), b.currency)} vs ${isCard ? 'statement' : 'bank'}`}`}
+                >
                   <span className="summary-name">
-                    <span>
-                      {a.name}
-                      {isCard && <span className="card-badge">CARD</span>}
-                    </span>
-                    <span className="muted summary-sub">
-                      {isCard ? 'Statement' : 'Bank'} {formatMoney(a.bank_balance, b.currency)}
-                      {a.balance_checked_at ? ` · ${shortDate(a.balance_checked_at.slice(0, 10))}` : ''}
-                    </span>
+                    {a.name}
+                    {isCard && <span className="card-badge">CARD</span>}
                   </span>
-                  <span className="summary-right">
-                    <span className="money summary-amount">
-                      {isCard ? 'owes ' : ''}
-                      {formatMoney(mine, b.currency)}
-                    </span>
-                    {off === 0 ? (
-                      <span className="match-ok summary-status">Matches</span>
-                    ) : (
-                      <span className="match-off summary-status">Off {formatMoney(Math.abs(off), b.currency)}</span>
-                    )}
+                  <span className={`money summary-amount ${off === 0 ? '' : 'summary-off'}`}>
+                    {isCard ? 'owes ' : ''}
+                    {formatMoney(mine, b.currency)}
                   </span>
                 </button>
               )
