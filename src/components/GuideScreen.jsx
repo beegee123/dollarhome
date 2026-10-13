@@ -89,10 +89,20 @@ export default function GuideScreen() {
             <dd>Tap Assign on an Unassigned row. Fill tops an item up to its plan (or a goal’s share this month).</dd>
             <dt>Move</dt>
             <dd>Move (bottom bar) sends money between items in the same currency.</dd>
+            <dt>Unplanned money</dt>
+            <dd>
+              A gift, a sale, a refund you didn’t plan for: add an income source called “Other income” with an empty
+              split (one per account it can land in). + Income in → Other income → amount and a note → Apply. It lands in
+              Unassigned; Assign it to the envelope you want (or Move it, if that envelope is in another account).
+            </dd>
           </dl>
           <p>
             <strong>Fixed vs percent splits.</strong> Salaries use fixed amounts. Income that varies, like the STR, uses
             percentages that add up to 100. Any line can be changed for one paycheck.
+          </p>
+          <p>
+            <strong>Similar paychecks.</strong> Open a source and tap Duplicate this source under Save: it copies the
+            split and its usual amount, so you only change what’s different.
           </p>
           <p>
             <strong>Total per account.</strong> While editing a split, each account shows its total, and the Total per
@@ -301,6 +311,7 @@ export default function GuideScreen() {
           <ul>
             <li>Undo appears for 6 seconds after most actions. A past spend can be deleted from the item’s Recent list.</li>
             <li>Archive hides banks, accounts and items without losing history; only empty ones can be archived.</li>
+            <li>Never used? A bank, account or income source with no history and nothing in it can be deleted outright instead (Delete appears only when that’s safe).</li>
             <li>
               Item in the wrong account? Setup → the account → tap the item → Move to another account. It brings its money
               and history; then move the money in your bank app.
