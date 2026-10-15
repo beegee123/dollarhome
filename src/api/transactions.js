@@ -106,7 +106,7 @@ export async function fetchMovesSinceCheck(accountId) {
 
   const { data, error } = await supabase
     .from('transactions')
-    .select('pair_id, amount, kind, occurred_on, created_at, category_id')
+    .select('pair_id, amount, kind, occurred_on, created_at, category_id, income_event_id')
     .gt('created_at', since)
     .not('pair_id', 'is', null)
   if (error) throw error
@@ -131,7 +131,7 @@ export async function fetchMovesSinceCheck(accountId) {
 
   const pairs = new Map()
   for (const t of data) {
-    const p = pairs.get(t.pair_id) ?? { pairId: t.pair_id, net: 0, kind: t.kind, date: t.occurred_on, created: t.created_at, others: new Set(), kinds: new Set() }
+    const p = pairs.get(t.pair_id) ?? { pairId: t.pair_id, eventId: t.income_event_id ?? null, net: 0, kind: t.kind, date: t.occurred_on, created: t.created_at, others: new Set(), kinds: new Set() }
     p.kinds.add(t.kind)
     const acc = catAccount.get(t.category_id)
     if (acc === accountId) {
@@ -141,7 +141,21 @@ export async function fetchMovesSinceCheck(accountId) {
     }
     pairs.set(t.pair_id, p)
   }
-  const list = [...pairs.values()]
+  // A paycheck split sends one transfer per budget item, but at the bank it's one transfer
+  // per account. Fold a paycheck's transfers to (or from) the same account into one row.
+  const grouped = new Map()
+  for (const p of pairs.values()) {
+    if (!p.eventId) {
+      grouped.set(p.pairId, p)
+      continue
+    }
+    const key = `e:${p.eventId}:${[...p.others].sort().join('|')}`
+    const g = grouped.get(key)
+    if (g) g.net += p.net
+    else grouped.set(key, { ...p, pairId: key, paycheck: true })
+  }
+
+  const list = [...grouped.values()]
     .map((p) => ({ ...p, net: Math.round(p.net * 100) / 100 }))
     .filter((p) => p.net !== 0)
     .sort((a, b) => (a.created < b.created ? 1 : -1))
@@ -152,7 +166,9 @@ export async function fetchMovesSinceCheck(accountId) {
       date: p.date,
       label: p.kinds.has('card_payment')
         ? 'Paid a credit card'
-        : p.others.size
+        : p.paycheck
+          ? `Paycheck ${p.net > 0 ? 'from' : 'to'} ${[...p.others].join(', ') || 'another account'}`
+          : p.others.size
           ? `${p.net > 0 ? 'From' : 'To'} ${[...p.others].join(', ')}`
           : 'Move',
     }))
