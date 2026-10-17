@@ -1147,3 +1147,7 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 }
 .bill-quick input[inputmode='decimal'] { width: 110px; }
 .bill-setup-date { width: 150px; }
+.bill-section { display: flex; flex-direction: column; gap: 8px; }
+.bill-section + .bill-section { margin-top: 10px; }
+.bill-section-title { margin: 0; }
+.bill-section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }

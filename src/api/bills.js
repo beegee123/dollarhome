@@ -160,3 +160,15 @@ export async function tagPairWithBill(pairId, billId) {
   const { error } = await supabase.from('transactions').update({ bill_id: billId }).eq('pair_id', pairId)
   if (error) throw error
 }
+
+// Pay a card's bills in one go: each from its own envelope, then the card the total.
+// lines: [{ billId, amount }] — all charged to cardId. Returns { ids, pairs, due } for Undo.
+export async function payCardBills(cardId, lines, paidOn) {
+  const { data, error } = await supabase.rpc('pay_card_bills', {
+    p_card_id: cardId,
+    p_lines: lines.map((l) => ({ bill_id: l.billId, amount: l.amount })),
+    p_paid_on: paidOn,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}

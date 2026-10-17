@@ -187,6 +187,7 @@ export default function GuideScreen() {
         <Section title="Bills">
           <ul>
             <li>Two kinds of bill. A <strong>bill</strong> is a spend from a budget item (mortgage, phone, hydro), paid from the bank or with a card. A <strong>card payment</strong> pays a credit card from its payment envelope, the same as Pay card.</li>
+            <li><strong>Paying a card’s bills in one go.</strong> Bills with Paid with set to a card show together under “On Visa” (with the card’s due date, if it has a card-payment bill). Tap <strong>Pay these</strong> on the card’s due date, check Enough/Short, then <strong>Log &amp; pay Visa</strong>: each bill comes out of its own budget item and the card is paid the total. “Log only” logs them without paying the card.</li>
             <li>Fastest setup: Bills → <strong>Set up bills</strong>. Every budget item is listed by account, like income splits; type the usual amount next to each one that’s a bill, pick Debit or a card and a next due date if you like, then Save. Clearing an amount removes that bill. Add card payments with + Add a bill → Card payment.</li>
             <li>Or add one at a time: Budget → Bills (or Setup → Bills) → + Add a bill.</li>
             <li>New amount or date (a hydro or card statement email)? Tap the bill’s <strong>amount</strong> on the Bills list, change the amount and next due date, Save.</li>

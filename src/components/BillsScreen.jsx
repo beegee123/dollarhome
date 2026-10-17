@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchBudget } from '../api/budget.js'
-import { addBill, deleteBill, fetchBills, payBills, saveBillsBulk, setBillAmount, setBillDue, unpayBills, updateBill } from '../api/bills.js'
+import { addBill, deleteBill, fetchBills, payBills, payCardBills, saveBillsBulk, setBillAmount, setBillDue, unpayBills, updateBill } from '../api/bills.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -104,6 +104,29 @@ export default function BillsScreen() {
   const envOf = (b) =>
     b.kind === 'card_payment' ? envelopes[cards[b.card_id]?.payment_category_id] : envelopes[b.category_id]
 
+  // The list in sections: bills paid from the bank, then one section per card with every
+  // bill charged to it (and the card's own payment bill, if there is one).
+  const bankBills = sorted.filter((b) => b.kind !== 'card_payment' && !b.card_id)
+  const cardIds = [...new Set(sorted.filter((b) => b.card_id).map((b) => b.card_id))]
+  const sections = [
+    ...(bankBills.length ? [{ key: 'bank', title: 'Paid from the bank', bills: bankBills }] : []),
+    ...cardIds.map((id) => {
+      const own = sorted.find((b) => b.kind === 'card_payment' && b.card_id === id)
+      const charged = sorted.filter((b) => b.kind === 'spend' && b.card_id === id)
+      return { key: id, card: cards[id], own, charged, bills: [...(own ? [own] : []), ...charged] }
+    }),
+  ]
+
+  // Ticked bills that are all charged to one card can be logged AND the card paid, in one go.
+  const oneCard =
+    chosen.length > 0 && chosen.every((b) => b.kind === 'spend' && b.card_id && b.card_id === chosen[0].card_id)
+      ? cards[chosen[0].card_id]
+      : null
+
+  function pickCardBills(sec) {
+    setSelected(Object.fromEntries(sec.charged.map((b) => [b.id, String(b.amount)])))
+  }
+
   async function saveQuick() {
     const amount = parseAmount(quick.amount)
     if (!amount) return setActionError('Enter the amount, like 142.30')
@@ -149,7 +172,7 @@ export default function BillsScreen() {
     })
   }
 
-  async function paySelected() {
+  async function paySelected(payCard = false) {
     if (badAmount) return setActionError('Every ticked bill needs an amount above 0.')
     if (chosen.some((b) => !envOf(b))) {
       return setActionError('A ticked bill’s budget item (or card) is gone or archived. Tap Edit and pick another.')
@@ -159,12 +182,13 @@ export default function BillsScreen() {
     const count = lines.length
     const total = totalText
     let undo = null
+    const card = payCard ? oneCard : null
     const ok = await run(async () => {
-      undo = await payBills(lines, paidOn)
+      undo = card ? await payCardBills(card.id, lines, paidOn) : await payBills(lines, paidOn)
     })
     if (ok) {
       setSelected({})
-      showToast(`Logged ${count} ${count === 1 ? 'bill' : 'bills'} · ${total}`, async () => {
+      showToast(card ? `Paid ${card.name}: ${count} ${count === 1 ? 'bill' : 'bills'} · ${total}` : `Logged ${count} ${count === 1 ? 'bill' : 'bills'} · ${total}`, async () => {
         setToast(null)
         await run(() => unpayBills(undo))
       })
@@ -217,7 +241,28 @@ export default function BillsScreen() {
           </p>
         )}
 
-        {sorted.map((b) => {
+        {sections.map((sec) => (
+          <section key={sec.key} className="bill-section" aria-label={sec.title ?? `On ${sec.card?.name ?? 'card'}`}>
+            {sec.card !== undefined && (
+              <div className="bill-section-head">
+                <span>
+                  <strong>On {sec.card?.name ?? 'a missing card'}</strong>
+                  {sec.own?.next_due && (
+                    <span className={sec.own.next_due < today ? 'match-off' : 'muted'}>
+                      {' '}
+                      · {sec.own.next_due < today ? 'past due' : 'due'} {shortDate(sec.own.next_due)}
+                    </span>
+                  )}
+                </span>
+                {sec.charged.length > 0 && sec.card && (
+                  <button type="button" className="small-button" onClick={() => pickCardBills(sec)}>
+                    Pay {sec.charged.length === 1 ? 'this bill' : `these ${sec.charged.length}`}
+                  </button>
+                )}
+              </div>
+            )}
+            {sec.title && <h2 className="section-title bill-section-title">{sec.title}</h2>}
+        {sec.bills.map((b) => {
           if (editingId === b.id) {
             return (
               <BillForm
@@ -333,6 +378,8 @@ export default function BillsScreen() {
             </div>
           )
         })}
+          </section>
+        ))}
 
         {editingId === 'new' ? (
           <BillForm
@@ -389,10 +436,24 @@ export default function BillsScreen() {
             <button type="button" className="secondary" onClick={() => setSelected({})}>
               Clear
             </button>
-            <button type="button" className="primary" disabled={busy} onClick={paySelected}>
-              {busy ? 'Logging…' : `Log ${chosen.length} ${chosen.length === 1 ? 'bill' : 'bills'}`}
+            <button type="button" className="primary" disabled={busy} onClick={() => paySelected(!!oneCard)}>
+              {busy
+                ? 'Logging…'
+                : oneCard
+                  ? `Log & pay ${oneCard.name}`
+                  : `Log ${chosen.length} ${chosen.length === 1 ? 'bill' : 'bills'}`}
             </button>
           </div>
+          {oneCard && (
+            <>
+              <p className="hint">
+                Each bill comes out of its own budget item, then {oneCard.name} is paid {totalText} from its payment envelope.
+              </p>
+              <button type="button" className="link-button" disabled={busy} onClick={() => paySelected(false)}>
+                Log only — I’ll pay {oneCard.name} later
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -698,7 +759,7 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
               </option>
             ))}
           </select>
-          <span className="hint">Paid from the card’s payment envelope, the same as Pay card.</span>
+          <span className="hint">This sets the card’s due date and pays its statement from the payment envelope (like Pay card). Bills charged to the card are added as normal bills with Paid with set to the card; they show under the card, ready to pay together.</span>
         </label>
       ) : (
         <>
