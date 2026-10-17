@@ -38,6 +38,7 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 15. `015_delete_empty.sql` — delete an account or bank that was never used (archive stays for ones with history)
 16. `016_convert_to_card.sql` — change a bare bank account into a credit card
 17. `017_bills.sql` — Bills: a saved list of regular bills, paid one at a time or in a batch
+18. `018_bill_types.sql` — bill types (spend or card payment) and a next-due date that moves forward when paid
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

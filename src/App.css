@@ -1113,3 +1113,37 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .summary-status { font: 600 12px var(--sans); }
 
 .summary-off { color: var(--empty, #b3261e); }
+.last-time { align-self: flex-start; margin: -4px 0 0; }
+
+/* ---- Bills: tap the amount to update it ---- */
+.bill-amount-button {
+  align-self: center;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px dashed #b9b9b0;
+  background: none;
+  font: 500 16px var(--mono);
+  color: var(--ink);
+  cursor: pointer;
+}
+.bill-quick {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 14px 12px 48px;
+  font-size: 13px;
+  color: #4a4a45;
+}
+.bill-quick label { display: flex; flex-direction: column; gap: 4px; }
+.bill-quick input {
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #cfcfc8;
+  border-radius: 10px;
+  background: #fff;
+  font: 500 15px var(--mono);
+}
+.bill-quick input[inputmode='decimal'] { width: 110px; }
+.bill-setup-date { width: 150px; }

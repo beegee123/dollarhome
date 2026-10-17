@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchBudget } from '../api/budget.js'
-import { addBill, deleteBill, fetchBills, payBills, saveBillsBulk, unpayBills, updateBill } from '../api/bills.js'
+import { addBill, deleteBill, fetchBills, payBills, saveBillsBulk, setBillAmount, setBillDue, unpayBills, updateBill } from '../api/bills.js'
 import { formatMoney, parseAmount, shortDate, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -17,6 +17,7 @@ export default function BillsScreen() {
   const [paidOn, setPaidOn] = useState(todayLocal())
   const [editingId, setEditingId] = useState(null) // a bill id, 'new', or null
   const [setupOpen, setSetupOpen] = useState(false) // the all-budget-items grid
+  const [quick, setQuick] = useState(null) // { id, amount, due } while updating a bill's amount / due date
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -87,12 +88,35 @@ export default function BillsScreen() {
   }
   if (bills === null) return <div className="screen center-message muted">Loading…</div>
 
-  // Soonest due day first; bills without a day go last.
+  // Soonest due first; bills without a due date go last.
   const sorted = [...bills].sort(
-    (a, b) => (a.due_day ?? 99) - (b.due_day ?? 99) || a.sort_order - b.sort_order || a.name.localeCompare(b.name),
+    (a, b) =>
+      (a.next_due ?? '9999').localeCompare(b.next_due ?? '9999') ||
+      a.sort_order - b.sort_order ||
+      a.name.localeCompare(b.name),
   )
   const chosen = sorted.filter((b) => b.id in selected)
-  const thisMonth = todayLocal().slice(0, 7)
+  const today = todayLocal()
+  const thisMonth = today.slice(0, 7)
+
+  // Where a bill's money comes from: its budget item, or for a card payment, the card's
+  // payment envelope.
+  const envOf = (b) =>
+    b.kind === 'card_payment' ? envelopes[cards[b.card_id]?.payment_category_id] : envelopes[b.category_id]
+
+  async function saveQuick() {
+    const amount = parseAmount(quick.amount)
+    if (!amount) return setActionError('Enter the amount, like 142.30')
+    const bill = bills.find((x) => x.id === quick.id)
+    const ok = await run(async () => {
+      if (amount !== bill.amount) await setBillAmount(bill.id, amount)
+      if ((quick.due || null) !== (bill.next_due || null)) await setBillDue(bill.id, quick.due)
+    })
+    if (ok) {
+      setQuick(null)
+      setSelected((s) => (bill.id in s ? { ...s, [bill.id]: String(amount) } : s))
+    }
+  }
 
   // What each chosen bill takes this time, grouped by the budget item it comes from.
   const groups = {}
@@ -100,8 +124,10 @@ export default function BillsScreen() {
   chosen.forEach((b) => {
     const amount = parseAmount(selected[b.id])
     if (!amount) badAmount = true
-    groups[b.category_id] ??= { envelope: envelopes[b.category_id], need: 0 }
-    groups[b.category_id].need += amount ?? 0
+    const env = envOf(b)
+    const key = env?.id ?? `none-${b.id}`
+    groups[key] ??= { envelope: env, need: 0 }
+    groups[key].need += amount ?? 0
   })
   const groupList = Object.values(groups)
   const shortCount = groupList.filter((g) => !g.envelope || g.envelope.balance < g.need).length
@@ -125,8 +151,8 @@ export default function BillsScreen() {
 
   async function paySelected() {
     if (badAmount) return setActionError('Every ticked bill needs an amount above 0.')
-    if (chosen.some((b) => !envelopes[b.category_id])) {
-      return setActionError('A ticked bill’s budget item is gone or archived. Tap Edit and pick another.')
+    if (chosen.some((b) => !envOf(b))) {
+      return setActionError('A ticked bill’s budget item (or card) is gone or archived. Tap Edit and pick another.')
     }
     if (shortCount > 0 && !window.confirm('Some budget items don’t have enough. Log anyway? They’ll go below zero.')) return
     const lines = chosen.map((b) => ({ billId: b.id, amount: parseAmount(selected[b.id]) }))
@@ -214,18 +240,21 @@ export default function BillsScreen() {
               />
             )
           }
-          const env = envelopes[b.category_id]
+          const env = envOf(b)
           const card = b.card_id ? cards[b.card_id] : null
-          const currency = env?.currency ?? 'USD'
+          const isCardPay = b.kind === 'card_payment'
+          const currency = env?.currency ?? card?.currency ?? 'USD'
           const on = b.id in selected
           const paidThisMonth = b.lastPaid?.slice(0, 7) === thisMonth
-          const sub = [
-            env ? `From ${env.name} · ${env.bankName} ${env.accountName}` : 'Budget item missing — tap Edit',
-            card ? `on ${card.name}` : null,
-            b.due_day ? `due ${ordinal(b.due_day)}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')
+          const overdue = b.next_due && b.next_due < today
+          const sub = isCardPay
+            ? [card ? `Card payment · ${card.name}` : 'Card missing — tap Edit', env ? `from ${env.name}` : null]
+            : [
+                env ? `From ${env.name} · ${env.bankName} ${env.accountName}` : 'Budget item missing — tap Edit',
+                card ? `on ${card.name}` : null,
+              ]
+          const subText = sub.filter(Boolean).join(' · ')
+          const updating = quick?.id === b.id
           return (
             <div key={b.id} className={`wish-row bill-row ${on ? 'wish-row--on' : ''}`}>
               <button type="button" className="wish-pick" aria-pressed={on} onClick={() => toggle(b)}>
@@ -234,18 +263,62 @@ export default function BillsScreen() {
                 </span>
                 <span className="setup-row-main">
                   <span className="setup-row-name">{b.name}</span>
-                  <span className="muted setup-row-sub">{sub}</span>
-                  {b.lastPaid && (
-                    <span className={`setup-row-sub ${paidThisMonth ? 'match-ok' : 'muted'}`}>
-                      {paidThisMonth ? `Paid ${shortDate(b.lastPaid)}` : `Last paid ${shortDate(b.lastPaid)}`}
-                    </span>
-                  )}
+                  <span className="muted setup-row-sub">{subText}</span>
+                  <span className="setup-row-sub">
+                    {b.next_due && (
+                      <span className={overdue ? 'match-off' : 'muted'}>
+                        {overdue ? 'Past due ' : 'Due '}
+                        {shortDate(b.next_due)}
+                      </span>
+                    )}
+                    {b.next_due && b.lastPaid && <span className="muted"> · </span>}
+                    {b.lastPaid && (
+                      <span className={paidThisMonth ? 'match-ok' : 'muted'}>
+                        {paidThisMonth ? 'Paid ' : 'Last paid '}
+                        {shortDate(b.lastPaid)}
+                      </span>
+                    )}
+                  </span>
                 </span>
-                <span className="money wish-price">{formatMoney(b.amount, currency)}</span>
+              </button>
+              {/* Tap the amount to update it (and the due date) when the new bill arrives. */}
+              <button
+                type="button"
+                className="money wish-price bill-amount-button"
+                aria-label={`Update ${b.name}: amount and due date`}
+                onClick={() => setQuick(updating ? null : { id: b.id, amount: String(b.amount), due: b.next_due ?? '' })}
+              >
+                {formatMoney(b.amount, currency)}
               </button>
               <button type="button" className="link-button wish-edit" onClick={() => setEditingId(b.id)} aria-label={`Edit ${b.name}`}>
                 Edit
               </button>
+              {updating && (
+                <div className="bill-quick">
+                  <label>
+                    <span>Amount</span>
+                    <input
+                      inputMode="decimal"
+                      autoComplete="off"
+                      autoFocus
+                      value={quick.amount}
+                      onChange={(e) => setQuick((q) => ({ ...q, amount: e.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    <span>Next due</span>
+                    <input type="date" value={quick.due} onChange={(e) => setQuick((q) => ({ ...q, due: e.target.value }))} />
+                  </label>
+                  <div className="inline-form">
+                    <button type="button" className="small-button" disabled={busy} onClick={saveQuick}>
+                      Save
+                    </button>
+                    <button type="button" className="small-button" onClick={() => setQuick(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               {on && (
                 <label className="bill-amount">
                   <span>This time</span>
@@ -339,24 +412,26 @@ export default function BillsScreen() {
 
 // Set up bills: every budget item (bank accounts only), grouped like the income split
 // editor. Type an amount next to each item that's a bill; clear it to remove the bill.
-// The bill takes the item's name. Paid with and Due day show once a row has an amount.
+// The bill takes the item's name. Paid with and Next due show once a row has an amount.
+// Card payments aren't in this grid; add those with + Add a bill.
 function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
   // One bill per budget item here; extra bills on the same item are left as they are.
+  const spendBills = bills.filter((b) => b.kind !== 'card_payment')
   const firstByItem = {}
-  bills.forEach((b) => (firstByItem[b.category_id] ??= b))
-  const extraCount = bills.length - Object.keys(firstByItem).length
+  spendBills.forEach((b) => (firstByItem[b.category_id] ??= b))
+  const extraCount = spendBills.length - Object.keys(firstByItem).length
 
   const [rows, setRows] = useState(() => {
     const init = {}
     Object.values(firstByItem).forEach((b) => {
-      init[b.category_id] = { amount: String(b.amount), cardId: b.card_id ?? '', dueDay: b.due_day ? String(b.due_day) : '' }
+      init[b.category_id] = { amount: String(b.amount), cardId: b.card_id ?? '', nextDue: b.next_due ?? '' }
     })
     return init
   })
   const [localError, setLocalError] = useState(null)
 
   const set = (itemId, field, value) =>
-    setRows((r) => ({ ...r, [itemId]: { amount: '', cardId: '', dueDay: '', ...r[itemId], [field]: value } }))
+    setRows((r) => ({ ...r, [itemId]: { amount: '', cardId: '', nextDue: '', ...r[itemId], [field]: value } }))
 
   // Card payment envelopes are paid with Pay card, so they're not bills.
   const paymentEnvelopes = new Set(Object.values(cards).map((c) => c.payment_category_id))
@@ -399,12 +474,12 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
           bad ??= item.name
           return
         }
-        const fields = { categoryId: item.id, amount, cardId: row.cardId || '', dueDay: row.dueDay ? Number(row.dueDay) : null }
+        const fields = { categoryId: item.id, amount, cardId: row.cardId || '', nextDue: row.nextDue || null }
         if (!existing) inserts.push({ ...fields, name: item.name, sortOrder: order++ })
         else if (
           existing.amount !== amount ||
           (existing.card_id ?? '') !== fields.cardId ||
-          (existing.due_day ?? null) !== fields.dueDay
+          (existing.next_due ?? null) !== fields.nextDue
         )
           updates.push({ ...fields, id: existing.id, name: existing.name })
       }),
@@ -501,19 +576,13 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
                             ))}
                           </select>
                         )}
-                        <select
-                          className="field-select"
-                          aria-label={`${item.name} due day`}
-                          value={row.dueDay}
-                          onChange={(e) => set(item.id, 'dueDay', e.target.value)}
-                        >
-                          <option value="">No due day</option>
-                          {Array.from({ length: 31 }, (_, n) => n + 1).map((d) => (
-                            <option key={d} value={d}>
-                              Due {ordinal(d)}
-                            </option>
-                          ))}
-                        </select>
+                        <input
+                          type="date"
+                          className="field-select bill-setup-date"
+                          aria-label={`${item.name} next due`}
+                          value={row.nextDue}
+                          onChange={(e) => set(item.id, 'nextDue', e.target.value)}
+                        />
                       </div>
                     )}
                   </div>
@@ -540,17 +609,20 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
 
 // Add or edit one bill: name, amount, budget item, paid with, due day.
 function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
+  const [kind, setKind] = useState(initial?.kind ?? 'spend')
   const [name, setName] = useState(initial?.name ?? '')
   const [amountText, setAmountText] = useState(initial ? String(initial.amount) : '')
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '')
   const [cardId, setCardId] = useState(initial?.card_id ?? '')
-  const [dueDay, setDueDay] = useState(initial?.due_day ? String(initial.due_day) : '')
+  const [nextDue, setNextDue] = useState(initial?.next_due ?? '')
   const [error, setError] = useState(null)
 
   // Only budget items in bank accounts (not cards), not Unassigned, not card payment envelopes.
   const paymentEnvelopes = new Set(Object.values(cards).map((c) => c.payment_category_id))
   const itemBank = banks.find((b) => b.accounts.some((a) => a.items.some((i) => i.id === categoryId)))
   const cardChoices = Object.values(cards).filter((c) => itemBank && c.currency === itemBank.currency)
+  const allCards = Object.values(cards)
+  const isCardPay = kind === 'card_payment'
 
   return (
     <form
@@ -559,69 +631,116 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
         e.preventDefault()
         const amount = parseAmount(amountText)
         if (!name.trim()) return
-        if (!amount) return setError('Enter the usual amount, like 85')
+        if (!amount) return setError('Enter the amount, like 85')
+        if (isCardPay) {
+          if (!cardId || !cards[cardId]) return setError('Pick the card this pays.')
+          setError(null)
+          return onSave({ kind, name, amount, cardId, categoryId: null, nextDue })
+        }
         if (!categoryId) return setError('Pick the budget item it comes from.')
         const card = cardId && cardChoices.some((c) => c.id === cardId) ? cardId : ''
         setError(null)
-        await onSave({ name, amount, categoryId, cardId: card, dueDay: dueDay ? Number(dueDay) : null })
+        await onSave({ kind, name, amount, categoryId, cardId: card, nextDue })
       }}
     >
+      {allCards.length > 0 && (
+        <fieldset className="chips">
+          <legend>Type</legend>
+          <label className={!isCardPay ? 'on' : ''}>
+            <input type="radio" name="bill-kind" checked={!isCardPay} onChange={() => setKind('spend')} />
+            Bill (a spend)
+          </label>
+          <label className={isCardPay ? 'on' : ''}>
+            <input
+              type="radio"
+              name="bill-kind"
+              checked={isCardPay}
+              onChange={() => {
+                setKind('card_payment')
+                setCardId('')
+              }}
+            />
+            Card payment
+          </label>
+        </fieldset>
+      )}
       <div className="spend-row">
         <label className="field">
-          <span>Bill</span>
-          <input placeholder="e.g. Bell phone" value={name} maxLength={60} autoFocus onChange={(e) => setName(e.target.value)} />
+          <span>Name</span>
+          <input
+            placeholder={isCardPay ? 'e.g. Visa statement' : 'e.g. Bell phone'}
+            value={name}
+            maxLength={60}
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
         <label className="field field--plan">
-          <span>Usual amount</span>
+          <span>{isCardPay ? 'Amount' : 'Usual amount'}</span>
           <input inputMode="decimal" placeholder="0" value={amountText} onChange={(e) => setAmountText(e.target.value)} />
         </label>
       </div>
-      <label className="field">
-        <span>Comes from (budget item)</span>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="field-select">
-          <option value="">Choose…</option>
-          {banks.map((b) =>
-            b.accounts
-              .filter((a) => a.kind !== 'credit')
-              .map((a) => {
-                const items = a.items.filter((i) => !i.is_unassigned && !paymentEnvelopes.has(i.id))
-                return items.length === 0 ? null : (
-                  <optgroup key={a.id} label={`${b.name} · ${a.name} (${b.currency})`}>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )
-              }),
-          )}
-        </select>
-      </label>
-      <div className="spend-row">
+      {isCardPay ? (
         <label className="field">
-          <span>Paid with</span>
-          <select value={cardId} onChange={(e) => setCardId(e.target.value)} className="field-select">
-            <option value="">Bank account (debit)</option>
-            {cardChoices.map((c) => (
+          <span>Card it pays</span>
+          <select
+            value={cardId}
+            onChange={(e) => {
+              setCardId(e.target.value)
+              if (!name.trim() && cards[e.target.value]) setName(`${cards[e.target.value].name} payment`)
+            }}
+            className="field-select"
+          >
+            <option value="">Choose…</option>
+            {allCards.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} (card)
+                {c.bankName} · {c.name}
               </option>
             ))}
           </select>
+          <span className="hint">Paid from the card’s payment envelope, the same as Pay card.</span>
         </label>
-        <label className="field field--plan">
-          <span>Due day</span>
-          <select value={dueDay} onChange={(e) => setDueDay(e.target.value)} className="field-select">
-            <option value="">None</option>
-            {Array.from({ length: 31 }, (_, n) => n + 1).map((d) => (
-              <option key={d} value={d}>
-                {ordinal(d)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      ) : (
+        <>
+          <label className="field">
+            <span>Comes from (budget item)</span>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="field-select">
+              <option value="">Choose…</option>
+              {banks.map((b) =>
+                b.accounts
+                  .filter((a) => a.kind !== 'credit')
+                  .map((a) => {
+                    const items = a.items.filter((i) => !i.is_unassigned && !paymentEnvelopes.has(i.id))
+                    return items.length === 0 ? null : (
+                      <optgroup key={a.id} label={`${b.name} · ${a.name} (${b.currency})`}>
+                        {items.map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  }),
+              )}
+            </select>
+          </label>
+          <label className="field">
+            <span>Paid with</span>
+            <select value={cardId} onChange={(e) => setCardId(e.target.value)} className="field-select">
+              <option value="">Bank account (debit)</option>
+              {cardChoices.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} (card)
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+      <label className="field field--date">
+        <span>Next due (optional)</span>
+        <input type="date" value={nextDue} onChange={(e) => setNextDue(e.target.value)} />
+      </label>
       {error && <p className="notice">{error}</p>}
       <div className="inline-form">
         <button type="submit" className="small-button" disabled={busy || !name.trim()}>

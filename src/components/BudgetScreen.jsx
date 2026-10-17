@@ -14,7 +14,7 @@ import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMon
 import { adjustToBank, setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
 import { cardSpend, payCard } from '../api/cards.js'
-import { tagPairWithBill } from '../api/bills.js'
+import { advanceBill, fetchCardBill, setBillDue, tagPairWithBill } from '../api/bills.js'
 import { formatMoney, normalize, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
@@ -109,6 +109,18 @@ export default function BudgetScreen() {
 
   // Save first, THEN change the screen: a spend is money, so the bar should
   // only move once the database has it.
+  // A bill was paid here (not on the Bills screen): move its due date on. Returns an
+  // undo for that, or null. Never blocks the spend itself.
+  async function markBillPaid(billId, paidOn) {
+    if (!billId) return null
+    try {
+      const prev = await advanceBill(billId, paidOn)
+      return prev ? () => setBillDue(billId, prev).catch(() => {}) : null
+    } catch {
+      return null
+    }
+  }
+
   async function saveSpend({ amount, note, occurredOn, cardId, billId }) {
     const { item, currency } = spending
     if (cardId) {
@@ -116,18 +128,22 @@ export default function BudgetScreen() {
       const card = banks.flatMap((b) => b.accounts).find((a) => a.id === cardId)
       const pairId = await cardSpend({ categoryId: item.id, cardId, amount, spentOn: occurredOn, note })
       if (billId) await tagPairWithBill(pairId, billId).catch(() => {}) // only affects the Paid label
+      const undoDue = await markBillPaid(billId, occurredOn)
       setSpending(null)
       setReloadCount((n) => n + 1)
-      showToast(`Logged ${formatMoney(amount, currency)} from ${item.name} on ${card?.name ?? 'card'}`, () =>
-        undoPairs([pairId]),
-      )
+      showToast(`Logged ${formatMoney(amount, currency)} from ${item.name} on ${card?.name ?? 'card'}`, () => {
+        undoDue?.()
+        undoPairs([pairId])
+      })
       return
     }
     const id = await logSpend({ categoryId: item.id, amount, note, occurredOn, billId }) // throws on failure; QuickSpend shows it
+    const undoDue = await markBillPaid(billId, occurredOn)
     adjustBalance(item.id, -amount)
     setSpending(null)
     showToast(`Logged ${formatMoney(amount, currency)} from ${item.name}`, async () => {
       setToast(null)
+      undoDue?.()
       try {
         await deleteTransaction(id)
         adjustBalance(item.id, amount)
@@ -438,10 +454,24 @@ export default function BudgetScreen() {
           onClose={() => setPayingCard(null)}
           onSave={async ({ amount, paidOn }) => {
             const pairId = await payCard({ cardId: payingCard.card.id, amount, paidOn })
+            // If this card has a card-payment bill, count this as paying it.
+            let undoDue = null
+            try {
+              const bill = await fetchCardBill(payingCard.card.id)
+              if (bill) {
+                await tagPairWithBill(pairId, bill.id)
+                undoDue = await markBillPaid(bill.id, paidOn)
+              }
+            } catch {
+              /* the payment itself is saved; only the bill's Paid label is affected */
+            }
             const name = payingCard.card.name
             setPayingCard(null)
             setReloadCount((n) => n + 1)
-            showToast(`Paid ${formatMoney(amount, payingCard.bank.currency)} to ${name}`, () => undoPairs([pairId]))
+            showToast(`Paid ${formatMoney(amount, payingCard.bank.currency)} to ${name}`, () => {
+              undoDue?.()
+              undoPairs([pairId])
+            })
           }}
         />
       )}

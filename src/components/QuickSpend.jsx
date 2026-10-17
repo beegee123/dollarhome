@@ -73,7 +73,7 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
   // Load this item's recent activity.
   useEffect(() => {
     let ignore = false
-    fetchRecent(item.id)
+    fetchRecent(item.id, 12) // a few extra, to find the last spend for "Last time"
       .then((rows) => !ignore && setRecent(rows))
       .catch(() => !ignore && setRecent([]))
     return () => {
@@ -82,6 +82,11 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
   }, [item.id])
 
   const amount = parseAmount(amountText)
+  // The most recent plain spend from this item (not a card's set-aside or a move).
+  const lastSpend = (() => {
+    const t = recent?.find((r) => r.kind === 'spend' && r.amount < 0)
+    return t ? Math.round(-t.amount * 100) / 100 : null
+  })()
   const after = item.balance - (amount ?? 0)
 
   async function handleSubmit(event) {
@@ -135,6 +140,20 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
               }}
             />
           </label>
+
+          {/* Fixed costs (mortgage, insurance…): one tap fills in what you spent last time. */}
+          {lastSpend && !billId && amount !== lastSpend && (
+            <button
+              type="button"
+              className="small-button last-time"
+              onClick={() => {
+                typed.current = true
+                setAmountText(String(lastSpend))
+              }}
+            >
+              Last time {formatMoney(lastSpend, currency)}
+            </button>
+          )}
 
           {/* Bills from this item: pick which one this pays (or none). */}
           {bills.length > 0 && (
@@ -224,7 +243,7 @@ export default function QuickSpend({ item, currency, onSave, onClose, onMove, on
           {recent === null && <p className="muted empty--small">Loading…</p>}
           {recent?.length === 0 && <p className="muted empty--small">Nothing yet.</p>}
           {recentError && <p className="notice">{recentError}</p>}
-          {recent?.map((t) => (
+          {recent?.slice(0, 5).map((t) => (
             <div key={t.id} className="recent-row">
               <span>
                 {shortDate(t.occurred_on)} · {t.note || KIND_LABELS[t.kind]}

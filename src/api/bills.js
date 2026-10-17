@@ -1,19 +1,25 @@
-// Bills: a saved list of regular bills (supabase/017_bills.sql).
+// Bills: a saved list of regular bills (supabase/017_bills.sql, 018_bill_types.sql).
+//   kind 'spend'        — a spend from a budget item (maybe paid with a card)
+//   kind 'card_payment' — pays a credit card from its payment envelope
+//   next_due            — when it's next due; moves forward a month each time it's paid
 import { supabase } from '../lib/supabase.js'
 
-// Every bill, plus the date each was last paid (from spends tagged with the bill).
+const PAID_KINDS = ['spend', 'card_payment']
+const dayOf = (iso) => (iso ? Number(iso.slice(8, 10)) : null)
+
+// Every bill, plus the date each was last paid (from transactions tagged with the bill).
 export async function fetchBills() {
   const [bills, paid] = await Promise.all([
     supabase
       .from('bills')
-      .select('id, name, category_id, amount, card_id, due_day, sort_order')
+      .select('id, name, kind, category_id, amount, card_id, due_day, next_due, sort_order')
       .order('sort_order')
       .order('name'),
     supabase
       .from('transactions')
       .select('bill_id, occurred_on')
       .not('bill_id', 'is', null)
-      .eq('kind', 'spend')
+      .in('kind', PAID_KINDS)
       .order('occurred_on', { ascending: false })
       .limit(2000),
   ])
@@ -21,37 +27,50 @@ export async function fetchBills() {
   if (paid.error) throw paid.error
   const lastPaid = {}
   for (const t of paid.data) lastPaid[t.bill_id] ??= t.occurred_on
-  return bills.data.map((b) => ({ ...b, amount: Number(b.amount), lastPaid: lastPaid[b.id] ?? null }))
+  return bills.data.map((b) => ({ ...b, kind: b.kind ?? 'spend', amount: Number(b.amount), lastPaid: lastPaid[b.id] ?? null }))
 }
 
-export async function addBill({ name, categoryId, amount, cardId, dueDay, sortOrder }) {
-  const { error } = await supabase.from('bills').insert({
+// The columns for one bill. Card payments have no budget item and always use their card.
+function row({ name, kind = 'spend', categoryId, amount, cardId, nextDue }) {
+  return {
     name: name.trim(),
-    category_id: categoryId,
+    kind,
+    category_id: kind === 'card_payment' ? null : categoryId,
     amount,
     card_id: cardId || null,
-    due_day: dueDay || null,
-    sort_order: sortOrder,
-  })
+    next_due: nextDue || null,
+    due_day: dayOf(nextDue),
+  }
+}
+
+export async function addBill(fields) {
+  const { error } = await supabase.from('bills').insert({ ...row(fields), sort_order: fields.sortOrder })
   if (error) throw error
 }
 
-export async function updateBill(id, { name, categoryId, amount, cardId, dueDay }) {
-  const { error } = await supabase
-    .from('bills')
-    .update({ name: name.trim(), category_id: categoryId, amount, card_id: cardId || null, due_day: dueDay || null })
-    .eq('id', id)
+export async function updateBill(id, fields) {
+  const { error } = await supabase.from('bills').update(row(fields)).eq('id', id)
   if (error) throw error
 }
 
-// Past spends stay; they just stop being linked to the bill.
+// Quick changes from the Bills list (just the amount, or just the due date).
+export async function setBillAmount(id, amount) {
+  const { error } = await supabase.from('bills').update({ amount }).eq('id', id)
+  if (error) throw error
+}
+export async function setBillDue(id, nextDue) {
+  const { error } = await supabase.from('bills').update({ next_due: nextDue || null, due_day: dayOf(nextDue) }).eq('id', id)
+  if (error) throw error
+}
+
+// Past payments stay; they just stop being linked to the bill.
 export async function deleteBill(id) {
   const { error } = await supabase.from('bills').delete().eq('id', id)
   if (error) throw error
 }
 
-// Log the chosen bills as spends, all or nothing. lines: [{ billId, amount }]
-// Returns what Undo needs: { ids, pairs }.
+// Log the chosen bills, all or nothing. lines: [{ billId, amount }]
+// Returns what Undo needs: { ids, pairs, due }.
 export async function payBills(lines, paidOn) {
   const { data, error } = await supabase.rpc('pay_bills', {
     p_lines: lines.map((l) => ({ bill_id: l.billId, amount: l.amount })),
@@ -61,8 +80,8 @@ export async function payBills(lines, paidOn) {
   return data
 }
 
-// Undo a payBills: remove the plain spends and every row of each card spend.
-export async function unpayBills({ ids = [], pairs = [] }) {
+// Undo a payBills: remove its transactions and put each bill's due date back.
+export async function unpayBills({ ids = [], pairs = [], due = [] }) {
   if (ids.length) {
     const { error } = await supabase.from('transactions').delete().in('id', ids)
     if (error) throw error
@@ -71,24 +90,24 @@ export async function unpayBills({ ids = [], pairs = [] }) {
     const { error } = await supabase.from('transactions').delete().in('pair_id', pairs)
     if (error) throw error
   }
+  for (const d of due) await setBillDue(d.bill_id, d.prev)
 }
 
-// Save the "Set up bills" grid in one go.
-//   inserts: [{ name, categoryId, amount, cardId, dueDay, sortOrder }]
-//   updates: [{ id, name, categoryId, amount, cardId, dueDay }]
+// A bill was paid outside the Bills screen (Quick spend, Pay card): move its due date on.
+// Returns the previous due date (or null).
+export async function advanceBill(billId, paidOn) {
+  const { data, error } = await supabase.rpc('advance_bill', { p_bill_id: billId, p_on: paidOn })
+  if (error) throw error
+  return data
+}
+
+// Save the "Set up bills" grid in one go (spend bills only).
+//   inserts: [{ name, categoryId, amount, cardId, nextDue, sortOrder }]
+//   updates: [{ id, name, categoryId, amount, cardId, nextDue }]
 //   deleteIds: bills whose amount was cleared (their past spends stay)
 export async function saveBillsBulk({ inserts = [], updates = [], deleteIds = [] }) {
   if (inserts.length) {
-    const { error } = await supabase.from('bills').insert(
-      inserts.map((b) => ({
-        name: b.name.trim(),
-        category_id: b.categoryId,
-        amount: b.amount,
-        card_id: b.cardId || null,
-        due_day: b.dueDay || null,
-        sort_order: b.sortOrder,
-      })),
-    )
+    const { error } = await supabase.from('bills').insert(inserts.map((b) => ({ ...row(b), sort_order: b.sortOrder })))
     if (error) throw error
   }
   for (const b of updates) await updateBill(b.id, b)
@@ -98,10 +117,16 @@ export async function saveBillsBulk({ inserts = [], updates = [], deleteIds = []
   }
 }
 
-// The bills that come from one budget item (for pre-filling Quick spend), with last paid.
+// The spend bills that come from one budget item (for pre-filling Quick spend), with last paid.
 export async function fetchBillsForItem(categoryId) {
   const [bills, paid] = await Promise.all([
-    supabase.from('bills').select('id, name, amount, card_id, due_day').eq('category_id', categoryId).order('sort_order').order('name'),
+    supabase
+      .from('bills')
+      .select('id, name, amount, card_id, next_due')
+      .eq('category_id', categoryId)
+      .eq('kind', 'spend')
+      .order('sort_order')
+      .order('name'),
     supabase
       .from('transactions')
       .select('bill_id, occurred_on')
@@ -118,7 +143,19 @@ export async function fetchBillsForItem(categoryId) {
   return bills.data.map((b) => ({ ...b, amount: Number(b.amount), lastPaid: lastPaid[b.id] ?? null }))
 }
 
-// Tag a card spend (all its rows) with the bill it paid.
+// The card-payment bill for a card, if there is one (so Pay card can mark it paid).
+export async function fetchCardBill(cardId) {
+  const { data, error } = await supabase
+    .from('bills')
+    .select('id, name, amount, next_due')
+    .eq('kind', 'card_payment')
+    .eq('card_id', cardId)
+    .limit(1)
+  if (error) throw error
+  return data[0] ?? null
+}
+
+// Tag a pair of transactions (card spend or card payment) with the bill it paid.
 export async function tagPairWithBill(pairId, billId) {
   const { error } = await supabase.from('transactions').update({ bill_id: billId }).eq('pair_id', pairId)
   if (error) throw error
