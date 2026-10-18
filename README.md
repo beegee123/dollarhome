@@ -40,6 +40,7 @@ Run the files in `supabase/` in the Supabase SQL Editor, in number order.
 17. `017_bills.sql` — Bills: a saved list of regular bills, paid one at a time or in a batch
 18. `018_bill_types.sql` — bill types (spend or card payment) and a next-due date that moves forward when paid
 19. `019_pay_card_bills.sql` — pay all of a card's bills in one go: each from its envelope, then the card
+20. `020_card_due.sql` — a card's payment due date and monthly payment live on the card; the card-payment bill type is retired (its date and amount move to the card)
 
 After running `001`, add `money` to **Exposed schemas** in the project's Data API settings so the app can reach it.
 

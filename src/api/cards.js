@@ -47,3 +47,31 @@ export async function payCard({ cardId, amount, paidOn }) {
   if (error) throw error
   return data
 }
+
+// The card's payment date and monthly payment (supabase/020_card_due.sql).
+//   paymentDue      — next due date ('' clears it)
+//   monthlyPayment  — paid toward the balance each month on top of its bills (null = none)
+export async function setCardPayment(cardId, { paymentDue, monthlyPayment }) {
+  const { error } = await supabase
+    .from('accounts')
+    .update({
+      payment_due: paymentDue || null,
+      payment_day: paymentDue ? Number(paymentDue.slice(8, 10)) : null,
+      monthly_payment: monthlyPayment || null,
+    })
+    .eq('id', cardId)
+  if (error) throw error
+}
+
+// Just the due date (for Undo).
+export async function setCardDue(cardId, paymentDue) {
+  const { error } = await supabase.from('accounts').update({ payment_due: paymentDue || null }).eq('id', cardId)
+  if (error) throw error
+}
+
+// The card was paid: move its due date on a month. Returns the previous date (or null).
+export async function advanceCardDue(cardId, paidOn) {
+  const { data, error } = await supabase.rpc('advance_card_due', { p_card_id: cardId, p_on: paidOn })
+  if (error) throw error
+  return data
+}

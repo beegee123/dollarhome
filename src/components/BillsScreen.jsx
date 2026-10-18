@@ -20,6 +20,7 @@ export default function BillsScreen() {
   const [quick, setQuick] = useState(null) // { id, amount, due } while updating a bill's amount / due date
   const [busy, setBusy] = useState(false)
   const [tabBank, setTabBank] = useState(null) // bank name of the open tab
+  const [cardPay, setCardPay] = useState(null) // { forKey, text }: Log & pay's card payment, once you change it
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   const [reloadCount, setReloadCount] = useState(0)
@@ -100,14 +101,12 @@ export default function BillsScreen() {
   const today = todayLocal()
   const thisMonth = today.slice(0, 7)
 
-  // Where a bill's money comes from: its budget item, or for a card payment, the card's
-  // payment envelope.
-  const envOf = (b) =>
-    b.kind === 'card_payment' ? envelopes[cards[b.card_id]?.payment_category_id] : envelopes[b.category_id]
+  // Where a bill's money comes from: its budget item.
+  const envOf = (b) => envelopes[b.category_id]
 
   // The list in sections: bills paid from the bank, then one section per card with every
-  // bill charged to it (and the card's own payment bill, if there is one).
-  const bankBills = sorted.filter((b) => b.kind !== 'card_payment' && !b.card_id)
+  // bill charged to it. The card's due date comes from the card (Setup → the card).
+  const bankBills = sorted.filter((b) => !b.card_id)
   const cardIds = [...new Set(sorted.filter((b) => b.card_id).map((b) => b.card_id))]
   // Bank bills by bank (so each total stays in one currency).
   const bankGroups = {}
@@ -125,9 +124,8 @@ export default function BillsScreen() {
   const sections = [
     ...Object.values(bankGroups).map((g) => ({ ...g, ...totals(g.bills) })),
     ...cardIds.map((id) => {
-      const own = sorted.find((b) => b.kind === 'card_payment' && b.card_id === id)
-      const charged = sorted.filter((b) => b.kind === 'spend' && b.card_id === id)
-      return { key: id, card: cards[id], bankName: cards[id]?.bankName ?? 'Other', own, charged, bills: [...(own ? [own] : []), ...charged], currency: cards[id]?.currency ?? 'USD', ...totals(charged) }
+      const charged = sorted.filter((b) => b.card_id === id)
+      return { key: id, card: cards[id], bankName: cards[id]?.bankName ?? 'Other', charged, bills: charged, currency: cards[id]?.currency ?? 'USD', ...totals(charged) }
     }),
   ]
 
@@ -151,9 +149,20 @@ export default function BillsScreen() {
 
   // Ticked bills that are all charged to one card can be logged AND the card paid, in one go.
   const oneCard =
-    chosen.length > 0 && chosen.every((b) => b.kind === 'spend' && b.card_id && b.card_id === chosen[0].card_id)
+    chosen.length > 0 && chosen.every((b) => b.card_id && b.card_id === chosen[0].card_id)
       ? cards[chosen[0].card_id]
       : null
+
+  // Log & pay: what to pay the card. Suggested: these bills plus the card's monthly payment
+  // (never more than it will owe). Change it, or tap "Just these bills".
+  const chosenKey = chosen.map((b) => b.id).join(',')
+  const billsSum = Math.round(chosen.reduce((n, b) => n + (parseAmount(selected[b.id]) ?? 0), 0) * 100) / 100
+  const monthly = oneCard?.monthly_payment ?? 0
+  const suggestedPay = oneCard ? Math.round(Math.min(billsSum + monthly, oneCard.owed + billsSum) * 100) / 100 : 0
+  const payText = cardPay?.forKey === chosenKey ? cardPay.text : String(suggestedPay)
+  const payAmount = parseAmount(payText)
+  const payEnv = oneCard ? envelopes[oneCard.payment_category_id] : null
+  const payEnvAfter = (payEnv?.balance ?? 0) + billsSum // the bills move their money in first
 
   function pickCardBills(sec) {
     setSelected(Object.fromEntries(sec.charged.map((b) => [b.id, String(b.amount)])))
@@ -215,12 +224,14 @@ export default function BillsScreen() {
     const total = totalText
     let undo = null
     const card = payCard ? oneCard : null
+    if (card && !payAmount) return setActionError(`Enter what to pay ${card.name}, like ${suggestedPay || 200}.`)
     const ok = await run(async () => {
-      undo = card ? await payCardBills(card.id, lines, paidOn) : await payBills(lines, paidOn)
+      undo = card ? await payCardBills(card.id, lines, paidOn, payAmount) : await payBills(lines, paidOn)
     })
     if (ok) {
       setSelected({})
-      showToast(card ? `Paid ${card.name}: ${count} ${count === 1 ? 'bill' : 'bills'} · ${total}` : `Logged ${count} ${count === 1 ? 'bill' : 'bills'} · ${total}`, async () => {
+      setCardPay(null)
+      showToast(card ? `Logged ${count} ${count === 1 ? 'bill' : 'bills'} · paid ${card.name} ${formatMoney(payAmount, card.currency)}` : `Logged ${count} ${count === 1 ? 'bill' : 'bills'} · ${total}`, async () => {
         setToast(null)
         await run(() => unpayBills(undo))
       })
@@ -303,10 +314,10 @@ export default function BillsScreen() {
               <div className="bill-section-head">
                 <span>
                   <strong>On {sec.card?.name ?? 'a missing card'}</strong>
-                  {sec.own?.next_due && (
-                    <span className={sec.own.next_due < today ? 'match-off' : 'muted'}>
+                  {sec.card?.payment_due && (
+                    <span className={sec.card.payment_due < today ? 'match-off' : 'muted'}>
                       {' '}
-                      · {sec.own.next_due < today ? 'past due' : 'due'} {shortDate(sec.own.next_due)}
+                      · {sec.card.payment_due < today ? 'past due' : 'due'} {shortDate(sec.card.payment_due)}
                     </span>
                   )}
                 </span>
@@ -349,17 +360,14 @@ export default function BillsScreen() {
           }
           const env = envOf(b)
           const card = b.card_id ? cards[b.card_id] : null
-          const isCardPay = b.kind === 'card_payment'
           const currency = env?.currency ?? card?.currency ?? 'USD'
           const on = b.id in selected
           const paidThisMonth = b.lastPaid?.slice(0, 7) === thisMonth
           const overdue = b.next_due && b.next_due < today
-          const sub = isCardPay
-            ? [card ? `Card payment · ${card.name}` : 'Card missing — tap Edit', env ? `from ${env.name}` : null]
-            : [
-                env ? `From ${env.name} · ${env.bankName} ${env.accountName}` : 'Budget item missing — tap Edit',
-                card ? `on ${card.name}` : null,
-              ]
+          const sub = [
+            env ? `From ${env.name} · ${env.bankName} ${env.accountName}` : 'Budget item missing — tap Edit',
+            card ? `on ${card.name}` : null,
+          ]
           const subText = sub.filter(Boolean).join(' · ')
           const updating = quick?.id === b.id
           return (
@@ -490,6 +498,42 @@ export default function BillsScreen() {
               )}
             </div>
           ))}
+          {oneCard && (
+            <div className="card-pay-box">
+              <label className="field">
+                <span>Pay {oneCard.name}</span>
+                <input
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={payText}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setCardPay({ forKey: chosenKey, text: e.target.value })}
+                />
+              </label>
+              <p className="hint">
+                Bills <span className="money">{formatMoney(billsSum, oneCard.currency)}</span>
+                {monthly > 0 && (
+                  <>
+                    {' '}+ monthly payment <span className="money">{formatMoney(monthly, oneCard.currency)}</span>
+                  </>
+                )}
+                {payAmount !== billsSum && (
+                  <>
+                    {' · '}
+                    <button type="button" className="link-button" onClick={() => setCardPay({ forKey: chosenKey, text: String(billsSum) })}>
+                      Just these bills
+                    </button>
+                  </>
+                )}
+              </p>
+              {payEnv && payAmount > payEnvAfter && (
+                <p className="hint match-off">
+                  {payEnv.name} will hold {formatMoney(payEnvAfter, oneCard.currency)} after the bills, short{' '}
+                  {formatMoney(payAmount - payEnvAfter, oneCard.currency)}. Assign or move money into it first, or pay less.
+                </p>
+              )}
+            </div>
+          )}
           <label className="field field--date bill-date">
             <span>Paid on</span>
             <input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} required />
@@ -509,7 +553,7 @@ export default function BillsScreen() {
           {oneCard && (
             <>
               <p className="hint">
-                Each bill comes out of its own budget item, then {oneCard.name} is paid {totalText} from its payment envelope.
+                Each bill comes out of its own budget item, then {oneCard.name} is paid {payAmount ? formatMoney(payAmount, oneCard.currency) : 'the amount above'} from its payment envelope. Its due date moves on a month.
               </p>
               <button type="button" className="link-button" disabled={busy} onClick={() => paySelected(false)}>
                 Log only — I’ll pay {oneCard.name} later
@@ -536,10 +580,10 @@ export default function BillsScreen() {
 // Set up bills: every budget item (bank accounts only), grouped like the income split
 // editor. Type an amount next to each item that's a bill; clear it to remove the bill.
 // The bill takes the item's name. Paid with and Next due show once a row has an amount.
-// Card payments aren't in this grid; add those with + Add a bill.
+// A card's own payment date is set on the card (Setup → the card).
 function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
   // One bill per budget item here; extra bills on the same item are left as they are.
-  const spendBills = bills.filter((b) => b.kind !== 'card_payment')
+  const spendBills = bills
   const firstByItem = {}
   spendBills.forEach((b) => (firstByItem[b.category_id] ??= b))
   const extraCount = spendBills.length - Object.keys(firstByItem).length
@@ -737,7 +781,6 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
 
 // Add or edit one bill: name, amount, budget item, paid with, due day.
 function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
-  const [kind, setKind] = useState(initial?.kind ?? 'spend')
   const [name, setName] = useState(initial?.name ?? '')
   const nameTyped = useRef(!!initial) // editing an existing bill: never overwrite its name
   const [amountText, setAmountText] = useState(initial ? String(initial.amount) : '')
@@ -750,8 +793,6 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
   const paymentEnvelopes = new Set(Object.values(cards).map((c) => c.payment_category_id))
   const itemBank = banks.find((b) => b.accounts.some((a) => a.items.some((i) => i.id === categoryId)))
   const cardChoices = Object.values(cards).filter((c) => itemBank && c.currency === itemBank.currency)
-  const allCards = Object.values(cards)
-  const isCardPay = kind === 'card_payment'
 
   return (
     <form
@@ -761,109 +802,59 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
         const amount = parseAmount(amountText)
         if (!name.trim()) return
         if (!amount) return setError('Enter the amount, like 85')
-        if (isCardPay) {
-          if (!cardId || !cards[cardId]) return setError('Pick the card this pays.')
-          setError(null)
-          return onSave({ kind, name, amount, cardId, categoryId: null, nextDue })
-        }
         if (!categoryId) return setError('Pick the budget item it comes from.')
         const card = cardId && cardChoices.some((c) => c.id === cardId) ? cardId : ''
         setError(null)
-        await onSave({ kind, name, amount, categoryId, cardId: card, nextDue })
+        await onSave({ name, amount, categoryId, cardId: card, nextDue })
       }}
     >
-      {allCards.length > 0 && (
-        <fieldset className="chips">
-          <legend>Type</legend>
-          <label className={!isCardPay ? 'on' : ''}>
-            <input type="radio" name="bill-kind" checked={!isCardPay} onChange={() => setKind('spend')} />
-            Bill (a spend)
-          </label>
-          <label className={isCardPay ? 'on' : ''}>
-            <input
-              type="radio"
-              name="bill-kind"
-              checked={isCardPay}
-              onChange={() => {
-                setKind('card_payment')
-                setCardId('')
-              }}
-            />
-            Card payment
-          </label>
-        </fieldset>
-      )}
-      {isCardPay ? (
-        <label className="field">
-          <span>Card it pays</span>
-          <select
-            value={cardId}
-            onChange={(e) => {
-              setCardId(e.target.value)
-              if (!nameTyped.current && cards[e.target.value]) setName(`${cards[e.target.value].name} payment`)
-            }}
-            className="field-select"
-          >
-            <option value="">Choose…</option>
-            {allCards.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.bankName} · {c.name}
-              </option>
-            ))}
-          </select>
-          <span className="hint">This sets the card’s due date and pays its statement from the payment envelope (like Pay card). Bills charged to the card are added as normal bills with Paid with set to the card; they show under the card, ready to pay together.</span>
-        </label>
-      ) : (
-        <>
-          <label className="field">
-            <span>Comes from (budget item)</span>
-            <select
-              value={categoryId}
-              onChange={(e) => {
-                setCategoryId(e.target.value)
-                // A bill is usually named after its budget item: fill it in unless you typed one.
-                const item = banks.flatMap((b) => b.accounts.flatMap((a) => a.items)).find((i) => i.id === e.target.value)
-                if (!nameTyped.current && item) setName(item.name)
-              }}
-              className="field-select"
-            >
-              <option value="">Choose…</option>
-              {banks.map((b) =>
-                b.accounts
-                  .filter((a) => a.kind !== 'credit')
-                  .map((a) => {
-                    const items = a.items.filter((i) => !i.is_unassigned && !paymentEnvelopes.has(i.id))
-                    return items.length === 0 ? null : (
-                      <optgroup key={a.id} label={`${b.name} · ${a.name} (${b.currency})`}>
-                        {items.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )
-                  }),
-              )}
-            </select>
-          </label>
-          <label className="field">
-            <span>Paid with</span>
-            <select value={cardId} onChange={(e) => setCardId(e.target.value)} className="field-select">
-              <option value="">Bank account (debit)</option>
-              {cardChoices.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} (card)
-                </option>
-              ))}
-            </select>
-          </label>
-        </>
-      )}
+      <label className="field">
+        <span>Comes from (budget item)</span>
+        <select
+          value={categoryId}
+          onChange={(e) => {
+            setCategoryId(e.target.value)
+            // A bill is usually named after its budget item: fill it in unless you typed one.
+            const item = banks.flatMap((b) => b.accounts.flatMap((a) => a.items)).find((i) => i.id === e.target.value)
+            if (!nameTyped.current && item) setName(item.name)
+          }}
+          className="field-select"
+        >
+          <option value="">Choose…</option>
+          {banks.map((b) =>
+            b.accounts
+              .filter((a) => a.kind !== 'credit')
+              .map((a) => {
+                const items = a.items.filter((i) => !i.is_unassigned && !paymentEnvelopes.has(i.id))
+                return items.length === 0 ? null : (
+                  <optgroup key={a.id} label={`${b.name} · ${a.name} (${b.currency})`}>
+                    {items.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              }),
+          )}
+        </select>
+      </label>
+      <label className="field">
+        <span>Paid with</span>
+        <select value={cardId} onChange={(e) => setCardId(e.target.value)} className="field-select">
+          <option value="">Bank account (debit)</option>
+          {cardChoices.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} (card)
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="spend-row">
         <label className="field">
           <span>Name</span>
           <input
-            placeholder={isCardPay ? 'e.g. Visa statement' : 'e.g. Bell phone'}
+            placeholder="e.g. Bell phone"
             value={name}
             maxLength={60}
             onChange={(e) => {
@@ -873,7 +864,7 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
           />
         </label>
         <label className="field field--plan">
-          <span>{isCardPay ? 'Amount' : 'Usual amount'}</span>
+          <span>Usual amount</span>
           <input inputMode="decimal" placeholder="0" value={amountText} onChange={(e) => setAmountText(e.target.value)} />
         </label>
       </div>

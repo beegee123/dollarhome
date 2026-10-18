@@ -13,9 +13,9 @@ import { fetchBudget } from '../api/budget.js'
 import { assignFromUnassigned, deletePairs, deleteTransaction, logSpend, moveMoney } from '../api/transactions.js'
 import { adjustToBank, setBankBalance } from '../api/setup.js'
 import { applyIncome, undoIncome } from '../api/income.js'
-import { cardSpend, payCard } from '../api/cards.js'
-import { advanceBill, fetchCardBill, setBillDue, tagPairWithBill } from '../api/bills.js'
-import { formatMoney, normalize, todayLocal } from '../lib/money.js'
+import { advanceCardDue, cardSpend, payCard, setCardDue } from '../api/cards.js'
+import { advanceBill, setBillDue, tagPairWithBill } from '../api/bills.js'
+import { formatMoney, normalize, shortDate, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // The home screen: bank tabs → account sections → budget items.
@@ -453,17 +453,15 @@ export default function BudgetScreen() {
           currency={payingCard.bank.currency}
           onClose={() => setPayingCard(null)}
           onSave={async ({ amount, paidOn }) => {
-            const pairId = await payCard({ cardId: payingCard.card.id, amount, paidOn })
-            // If this card has a card-payment bill, count this as paying it.
+            const cardId = payingCard.card.id
+            const pairId = await payCard({ cardId, amount, paidOn })
+            // The card was paid: move its due date on a month.
             let undoDue = null
             try {
-              const bill = await fetchCardBill(payingCard.card.id)
-              if (bill) {
-                await tagPairWithBill(pairId, bill.id)
-                undoDue = await markBillPaid(bill.id, paidOn)
-              }
+              const prev = await advanceCardDue(cardId, paidOn)
+              if (prev) undoDue = () => setCardDue(cardId, prev).catch(() => {})
             } catch {
-              /* the payment itself is saved; only the bill's Paid label is affected */
+              /* the payment itself is saved; only the due date is affected */
             }
             const name = payingCard.card.name
             setPayingCard(null)
@@ -646,6 +644,22 @@ function CardSection({ bank, card, title, envelope, onUpdateBalance, onPay }) {
               'Payment envelope missing'
             )}
           </span>
+          {(card.payment_due || card.monthly_payment > 0) && (
+            <span className="muted setup-row-sub">
+              {card.payment_due && (
+                <span className={card.payment_due < todayLocal() ? 'match-off' : ''}>
+                  {card.payment_due < todayLocal() ? 'Past due ' : 'Due '}
+                  {shortDate(card.payment_due)}
+                </span>
+              )}
+              {card.payment_due && card.monthly_payment > 0 && ' · '}
+              {card.monthly_payment > 0 && (
+                <>
+                  pays <span className="money">{formatMoney(card.monthly_payment, c)}</span> a month on the balance
+                </>
+              )}
+            </span>
+          )}
         </div>
         <button type="button" className="small-button" disabled={!envelope || card.owed <= 0} onClick={() => onPay(envelope)}>
           Pay card

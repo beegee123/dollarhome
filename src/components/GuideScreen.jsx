@@ -186,16 +186,18 @@ export default function GuideScreen() {
 
         <Section title="Bills">
           <ul>
-            <li>Two kinds of bill. A <strong>bill</strong> is a spend from a budget item (mortgage, phone, hydro), paid from the bank or with a card. A <strong>card payment</strong> pays a credit card from its payment envelope, the same as Pay card.</li>
-            <li><strong>Paying a card’s bills in one go.</strong> Bills with Paid with set to a card show together under “On Visa” (with the card’s due date, if it has a card-payment bill). Tap <strong>Pay these</strong> on the card’s due date, check Enough/Short, then <strong>Log &amp; pay Visa</strong>: each bill comes out of its own budget item and the card is paid the total. “Log only” logs them without paying the card.</li>
-            <li>Fastest setup: Bills → <strong>Set up bills</strong>. Every budget item is listed by account, like income splits; type the usual amount next to each one that’s a bill, pick Debit or a card and a next due date if you like, then Save. Clearing an amount removes that bill. Add card payments with + Add a bill → Card payment.</li>
+            <li>A <strong>bill</strong> is a spend from a budget item (mortgage, phone, hydro), paid from the bank or with a card.</li>
+            <li><strong>Quickest way to add one:</strong> Setup → the account → tap the budget item → switch on <strong>This is a bill</strong>, pick Paid with (Debit or a card) and Next due, Save. The bill takes the item’s name and its monthly plan as the amount. Switching it off removes the bill; past payments stay.</li>
+            <li><strong>A card’s due date and monthly payment</strong> are on the card: Setup → the card → Card payment. Monthly payment is what your plan says to pay toward the balance each month, on top of the bills charged to the card. Paying the card (Pay card or Log &amp; pay) moves the due date on a month.</li>
+            <li><strong>Paying a card’s bills in one go.</strong> Bills with Paid with set to a card show together under “On Visa”, with the card’s due date. Tap <strong>Pay these</strong> on the due date and check Enough/Short. <strong>Pay Visa</strong> starts at the bills plus the card’s monthly payment; change it, or tap “Just these bills”. Then <strong>Log &amp; pay Visa</strong>: each bill comes out of its own budget item, then the card is paid that amount from its payment envelope. “Log only” logs them without paying the card.</li>
+            <li>Fastest setup: Bills → <strong>Set up bills</strong>. Every budget item is listed by account, like income splits; type the usual amount next to each one that’s a bill, pick Debit or a card and a next due date if you like, then Save. Clearing an amount removes that bill.</li>
             <li>Or add one at a time: Budget → Bills (or Setup → Bills) → + Add a bill. Pick the budget item first and the Name fills in with it (type your own to keep it).</li>
             <li>Bills has a tab per bank. Each tab holds that bank’s bills paid from the account, then its own cards’ bills. Under the tabs: the tab’s total this month and what’s left, or “all paid”; each group shows its own total too. Switching tabs clears your ticks, so Log only covers the tab you’re on.</li>
             <li>Set up bills has the same bank tabs, with that bank’s monthly bills total just under them.</li>
             <li>New amount or date (a hydro or card statement email)? Tap the bill’s <strong>amount</strong> on the Bills list, change the amount and next due date, Save.</li>
-            <li>When bills go out, tick them. Tick one or several, change “This time” if needed, check the date, then tap Log. The panel shows whether each budget item (or card payment envelope) has enough. Undo takes the whole batch back.</li>
+            <li>When bills go out, tick them. Tick one or several, change “This time” if needed, check the date, then tap Log. The panel shows whether each budget item has enough. Undo takes the whole batch back.</li>
             <li>Bills are sorted by when they’re due. Logging a bill moves its due date to next month; one past its date shows <span className="match-off">Past due</span>. A bill logged this month shows <span className="match-ok">Paid</span>.</li>
-            <li>Paying one bill from Budget: tap its budget item. The spend panel opens filled in from the bill, so just tap Log spend (choose “Not a bill” for an ordinary spend). Paying a card with Pay card also marks its card-payment bill paid.</li>
+            <li>Paying one bill from Budget: tap its budget item. The spend panel opens filled in from the bill, so just tap Log spend (choose “Not a bill” for an ordinary spend).</li>
             <li>No bill for it? The spend panel offers <strong>Last time $X</strong>: one tap fills in what you spent from that item last time, handy for fixed costs.</li>
             <li>Deleting a bill keeps its past payments in your history.</li>
           </ul>
@@ -288,7 +290,7 @@ export default function GuideScreen() {
             On the card’s section tap Pay card. The amount starts at what the card owes, or what the payment envelope holds
             if that’s less. Change the amount or date and save, then make the same payment in your bank app. You can’t
             pay more than the card owes. If the envelope holds less than the payment, DollarHome warns you and lets it go
-            below zero.
+            below zero. Paying moves the card’s due date (Setup → the card → Card payment) on a month.
           </p>
 
           <h3>Update the balance</h3>

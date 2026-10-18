@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import BalanceSheet from './BalanceSheet.jsx'
 import { NameForm } from './SetupScreen.jsx'
-import { convertToCard } from '../api/cards.js'
+import { convertToCard, setCardPayment } from '../api/cards.js'
+import { addBill, deleteBill, fetchBillsForItems, updateBill } from '../api/bills.js'
 import { addItem, adjustToBank, deleteAccount, fetchAccountItems, fetchSetup, moveItem, setBankBalance, swapOrder, updateItem, updateRow } from '../api/setup.js'
-import { formatMoney, monthYear, parseBalance, shortDate, targetPace } from '../lib/money.js'
+import { formatMoney, monthYear, parseAmount, parseBalance, shortDate, targetPace, todayLocal } from '../lib/money.js'
 import { friendlyError } from '../lib/errors.js'
 
 // Setup → one account. Everything about it in one place:
@@ -28,6 +29,8 @@ export default function AccountItemsScreen() {
   useEffect(() => {
     let ignore = false
     fetchAccountItems(accountId)
+      // The bills that come from these items (for "This is a bill"). No bills table yet: none.
+      .then(async (d) => ({ ...d, bills: await fetchBillsForItems(d.items.map((i) => i.id)).catch(() => []) }))
       .then((d) => {
         if (ignore) return
         setData(d)
@@ -67,7 +70,9 @@ export default function AccountItemsScreen() {
   }
   if (data === null) return <div className="screen center-message muted">Loading…</div>
 
-  const { account, items, unassigned, total, siblings } = data
+  const { account, items, unassigned, total, siblings, cards, bills } = data
+  const billsByItem = {}
+  bills.forEach((b) => (billsByItem[b.category_id] ??= []).push(b))
   const currency = account.bank.currency
   const active = items.filter((i) => !i.archived)
   const archived = items.filter((i) => i.archived)
@@ -82,6 +87,36 @@ export default function AccountItemsScreen() {
   const owed = -total // a card's total is minus what it owes
   const off = Math.round((account.bank_balance - (isCard ? owed : total)) * 100) / 100
   const position = siblings.findIndex((s) => s.id === account.id)
+
+  // Save a budget item, then its bill: "This is a bill" on → add or update it (named after
+  // the item, the amount following the plan); off → remove it (past payments stay).
+  async function saveItemAndBill(itemId, f, before) {
+    const id = itemId ?? (await addItem({ accountId, name: f.name, plannedAmount: f.plannedAmount, targetType: f.targetType, targetDate: f.targetDate, sortOrder: nextOrder }))
+    if (itemId) {
+      await updateItem(itemId, {
+        name: f.name,
+        planned_amount: f.plannedAmount,
+        target_type: f.targetType,
+        target_date: f.targetType === 'by_date' ? f.targetDate : null,
+      })
+    }
+    const bill = itemId ? billsByItem[itemId]?.[0] : null
+    if (f.bill) {
+      const fields = {
+        // Keep a bill name you chose; otherwise it follows the item's name.
+        name: bill && bill.name !== before?.name ? bill.name : f.name,
+        categoryId: id,
+        // A bill's amount you updated on Bills stays, until the plan itself changes.
+        amount: bill && f.plannedAmount === before?.planned_amount ? bill.amount : f.plannedAmount,
+        cardId: f.bill.cardId,
+        nextDue: f.bill.nextDue,
+      }
+      if (bill) await updateBill(bill.id, fields)
+      else await addBill(fields)
+    } else if (bill) {
+      await deleteBill(bill.id)
+    }
+  }
 
   // Only an empty budget item can be archived.
   function archiveItem(item) {
@@ -169,6 +204,14 @@ export default function AccountItemsScreen() {
           the money is set aside in its payment envelope until you tap <strong>Pay card</strong> on Budget.
         </p>
       )}
+      {isCard && (
+        <CardPayment
+          account={account}
+          currency={currency}
+          busy={busy}
+          onSave={(f) => run(() => setCardPayment(account.id, f))}
+        />
+      )}
 
       <section className="bank-card" hidden={isCard}>
         <div className="bank-card-head">
@@ -186,19 +229,12 @@ export default function AccountItemsScreen() {
               key={item.id}
               currency={currency}
               initial={item}
+              cards={cards}
+              bills={billsByItem[item.id] ?? []}
               submitLabel="Save"
               busy={busy}
               onCancel={() => setEditingId(null)}
-              onSubmit={async (f) =>
-                (await run(() =>
-                  updateItem(item.id, {
-                    name: f.name,
-                    planned_amount: f.plannedAmount,
-                    target_type: f.targetType,
-                    target_date: f.targetType === 'by_date' ? f.targetDate : null,
-                  }),
-                )) && setEditingId(null)
-              }
+              onSubmit={async (f) => (await run(() => saveItemAndBill(item.id, f, item))) && setEditingId(null)}
               // Rarely-used tools live inside the editor, not on every row.
               extra={
                 <>
@@ -257,6 +293,12 @@ export default function AccountItemsScreen() {
                     </>
                   )}{' '}
                   · holds <span className="money">{formatMoney(item.balance, currency)}</span>
+                  {billsByItem[item.id] && (
+                    <span className="bill-tag">
+                      {' '}
+                      · Bill{billsByItem[item.id][0].next_due ? `, due ${shortDate(billsByItem[item.id][0].next_due)}` : ''}
+                    </span>
+                  )}
                 </span>
               </span>
               <span className="muted edit-word">Edit</span>
@@ -264,11 +306,7 @@ export default function AccountItemsScreen() {
           ),
         )}
 
-        <AddItem
-          currency={currency}
-          busy={busy}
-          onAdd={(f) => run(() => addItem({ accountId, ...f, sortOrder: nextOrder }))}
-        />
+        <AddItem currency={currency} cards={cards} busy={busy} onAdd={(f) => run(() => saveItemAndBill(null, f, null))} />
 
         {archived.length > 0 && (
           <details className="archived">
@@ -362,7 +400,7 @@ export default function AccountItemsScreen() {
   )
 }
 
-function AddItem({ currency, busy, onAdd }) {
+function AddItem({ currency, cards, busy, onAdd }) {
   const [open, setOpen] = useState(false)
   if (!open) {
     return (
@@ -375,6 +413,8 @@ function AddItem({ currency, busy, onAdd }) {
     <ItemForm
       currency={currency}
       initial={null}
+      cards={cards}
+      bills={[]}
       submitLabel="Add item"
       busy={busy}
       onCancel={() => setOpen(false)}
@@ -387,7 +427,11 @@ function AddItem({ currency, busy, onAdd }) {
 
 // Name + target. Used for adding and for editing.
 // Target: Monthly (aim to have this much each month) or Save up to an amount by a date.
-function ItemForm({ currency, initial, submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
+function ItemForm({ currency, initial, cards = [], bills = [], submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
+  const bill = bills[0] ?? null
+  const [isBill, setIsBill] = useState(!!bill)
+  const [paidWith, setPaidWith] = useState(bill?.card_id ?? '')
+  const [billDue, setBillDue] = useState(bill?.next_due ?? '')
   const [name, setName] = useState(initial?.name ?? '')
   const [planText, setPlanText] = useState(initial ? String(initial.planned_amount) : '')
   const [targetType, setTargetType] = useState(initial?.target_type ?? 'monthly')
@@ -414,13 +458,28 @@ function ItemForm({ currency, initial, submitLabel, busy, onSubmit, onCancel, cl
           setError('A goal needs an amount and a date.')
           return
         }
+        const asBill = isBill && !isGoal
+        if (asBill && !(plan > 0)) {
+          setError('A bill needs its amount each month, like 85.')
+          return
+        }
+        if (!asBill && bill && !window.confirm(`Stop treating ${initial?.name ?? 'this'} as a bill? It leaves the Bills list; past payments stay.`)) return
         setError(null)
-        const ok = await onSubmit({ name: name.trim(), plannedAmount: plan, targetType, targetDate: isGoal ? targetDate : null })
+        const ok = await onSubmit({
+          name: name.trim(),
+          plannedAmount: plan,
+          targetType,
+          targetDate: isGoal ? targetDate : null,
+          bill: asBill ? { cardId: cards.some((c) => c.id === paidWith) ? paidWith : '', nextDue: billDue } : null,
+        })
         if (ok && clearAfterSubmit) {
           setName('')
           setPlanText('')
           setTargetType('monthly')
           setTargetDate('')
+          setIsBill(false)
+          setPaidWith('')
+          setBillDue('')
         }
       }}
     >
@@ -465,6 +524,38 @@ function ItemForm({ currency, initial, submitLabel, busy, onSubmit, onCancel, cl
             : 'For a goal or a bill: a vacation, an emergency fund, a tax payment.'
           : 'For everyday spending: what you aim to have in it each month.'}
       </p>
+
+      {!isGoal && (
+        <div className="bill-switch">
+          <label className="switch-row">
+            <input type="checkbox" checked={isBill} onChange={(e) => setIsBill(e.target.checked)} />
+            <span>
+              <strong>This is a bill</strong>
+              <span className="muted"> · shows on Bills, ready to tick and log</span>
+            </span>
+          </label>
+          {isBill && (
+            <div className="spend-row">
+              <label className="field">
+                <span>Paid with</span>
+                <select value={paidWith} onChange={(e) => setPaidWith(e.target.value)} className="field-select">
+                  <option value="">Bank account (debit)</option>
+                  {cards.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} (card)
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field field--date">
+                <span>Next due</span>
+                <input type="date" value={billDue} onChange={(e) => setBillDue(e.target.value)} />
+              </label>
+            </div>
+          )}
+          {bills.length > 1 && <p className="hint">{bills.length} bills come from this item; this changes the first. Edit the others on Bills.</p>}
+        </div>
+      )}
 
       {error && <p className="notice">{error}</p>}
       <div className="inline-form">
@@ -627,5 +718,65 @@ function MoveItem({ item, account, currency, busy, onMove }) {
         </>
       )}
     </div>
+  )
+}
+
+// A card's payment: when it's next due, and what you pay toward the balance each month
+// on top of the bills charged to it (a payment plan). Paying the card moves the date on.
+function CardPayment({ account, currency, busy, onSave }) {
+  const [due, setDue] = useState(account.payment_due ?? '')
+  const [monthlyText, setMonthlyText] = useState(account.monthly_payment ? String(account.monthly_payment) : '')
+  const [error, setError] = useState(null)
+  const [saved, setSaved] = useState(false)
+  const monthly = monthlyText.trim() === '' ? 0 : parseAmount(monthlyText)
+  const changed = due !== (account.payment_due ?? '') || (monthly ?? -1) !== (account.monthly_payment ?? 0)
+
+  return (
+    <form
+      className="bank-card card-payment"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        if (monthly === null) return setError('Enter the monthly payment, like 300 (or leave it blank).')
+        setError(null)
+        if (await onSave({ paymentDue: due, monthlyPayment: monthly })) setSaved(true)
+      }}
+    >
+      <div className="bank-card-head">
+        <h2>Card payment</h2>
+        {account.payment_due && (
+          <span className={`setup-row-sub ${account.payment_due < todayLocal() ? 'match-off' : 'muted'}`}>
+            {account.payment_due < todayLocal() ? 'Past due ' : 'Due '}
+            {shortDate(account.payment_due)}
+          </span>
+        )}
+      </div>
+      <div className="spend-row">
+        <label className="field field--date">
+          <span>Payment due</span>
+          <input type="date" value={due} onChange={(e) => (setDue(e.target.value), setSaved(false))} />
+        </label>
+        <label className="field field--plan">
+          <span>Monthly payment ({currency})</span>
+          <input
+            inputMode="decimal"
+            placeholder="0"
+            value={monthlyText}
+            onChange={(e) => (setMonthlyText(e.target.value), setSaved(false))}
+          />
+        </label>
+      </div>
+      <p className="hint">
+        Monthly payment is what your plan says to pay toward the balance, on top of the bills charged to this card. Log &amp; pay on
+        Bills adds the two. Put it in your paycheck split for {account.name}’s payment envelope so it’s there on the due date.
+        Paying the card moves the due date on a month.
+      </p>
+      {error && <p className="notice">{error}</p>}
+      <div className="inline-form">
+        <button type="submit" className="small-button" disabled={busy || !changed}>
+          Save
+        </button>
+        {saved && !changed && <span className="match-ok">Saved ✓</span>}
+      </div>
+    </form>
   )
 }

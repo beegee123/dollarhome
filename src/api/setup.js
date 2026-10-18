@@ -109,12 +109,12 @@ export async function setBankBalance(accountId, amount) {
 export async function fetchAccountItems(accountId) {
   const { data: account, error } = await supabase
     .from('accounts')
-    .select('id, bank_id, name, kind, payment_category_id, bank_balance, balance_checked_at, sort_order, archived, bank:banks (id, name, currency)')
+    .select('id, bank_id, name, kind, payment_category_id, payment_due, monthly_payment, bank_balance, balance_checked_at, sort_order, archived, bank:banks (id, name, currency)')
     .eq('id', accountId)
     .single()
   if (error) throw error
 
-  const [items, siblings] = await Promise.all([
+  const [items, siblings, cards] = await Promise.all([
     supabase
       .from('category_balances')
       .select('id, name, planned_amount, target_type, target_date, sort_order, archived, is_unassigned, balance')
@@ -128,13 +128,27 @@ export async function fetchAccountItems(accountId) {
       .eq('archived', false)
       .order('sort_order')
       .order('name'),
+    // Cards that can pay this account's bills (same currency), for "This is a bill".
+    supabase
+      .from('accounts')
+      .select('id, name, bank:banks (name, currency)')
+      .eq('kind', 'credit')
+      .eq('archived', false)
+      .order('sort_order')
+      .order('name'),
   ])
   if (items.error) throw items.error
   if (siblings.error) throw siblings.error
+  if (cards.error) throw cards.error
 
   const all = items.data.map((i) => ({ ...i, planned_amount: Number(i.planned_amount), balance: Number(i.balance) }))
   return {
-    account: { ...account, bank_balance: Number(account.bank_balance) },
+    account: {
+      ...account,
+      bank_balance: Number(account.bank_balance),
+      monthly_payment: account.monthly_payment == null ? null : Number(account.monthly_payment),
+    },
+    cards: cards.data.filter((c) => c.bank?.currency === account.bank.currency),
     unassigned: all.find((i) => i.is_unassigned)?.balance ?? 0,
     total: all.reduce((sum, i) => sum + i.balance, 0), // everything DollarHome holds here
     items: all.filter((i) => !i.is_unassigned),
@@ -142,16 +156,18 @@ export async function fetchAccountItems(accountId) {
   }
 }
 
+// Returns the new item's id.
 export async function addItem({ accountId, name, plannedAmount, targetType = 'monthly', targetDate = null, sortOrder }) {
-  const { error } = await supabase.from('categories').insert({
+  const { data, error } = await supabase.from('categories').insert({
     account_id: accountId,
     name: name.trim(),
     planned_amount: plannedAmount,
     target_type: targetType,
     target_date: targetType === 'by_date' ? targetDate : null,
     sort_order: sortOrder,
-  })
+  }).select('id').single()
   if (error) throw friendly(error, `This account already has a budget item called “${name.trim()}”.`)
+  return data.id
 }
 
 // Rename, change the plan, archive or restore one budget item.

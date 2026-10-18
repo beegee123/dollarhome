@@ -1154,3 +1154,15 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bill-group-total { font: 600 13px var(--sans); text-transform: none; letter-spacing: 0; color: var(--ink); white-space: nowrap; }
 .bill-section-head { flex-wrap: wrap; }
 .bills-tab-total { margin: 4px 0 12px; font: 600 14px var(--sans); color: var(--ink); }
+/* "This is a bill" on a budget item, and a card's payment (Setup). */
+.bill-switch { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.switch-row { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; cursor: pointer; }
+.switch-row input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+.bill-tag { color: var(--accent); font-weight: 600; }
+.card-payment { display: grid; gap: 12px; }
+.card-pay-box { display: grid; gap: 6px; margin: 4px 0 8px; }
+.card-pay-box .link-button { padding: 0; font-size: 13px; }
+.bill-switch { grid-template-columns: minmax(0, 1fr); }
+.bill-switch .spend-row > * { min-width: 0; }
+.bill-switch input[type='date'] { width: 100%; min-width: 0; }
+.edit-word { white-space: nowrap; }

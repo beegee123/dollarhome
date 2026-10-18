@@ -1,8 +1,9 @@
 // Bills: a saved list of regular bills (supabase/017_bills.sql, 018_bill_types.sql).
-//   kind 'spend'        — a spend from a budget item (maybe paid with a card)
-//   kind 'card_payment' — pays a credit card from its payment envelope
-//   next_due            — when it's next due; moves forward a month each time it's paid
+//   Each is a spend from a budget item, paid from the bank or with a card.
+//   next_due — when it's next due; moves forward a month each time it's paid
+// A card's own payment date lives on the card (020_card_due.sql), not in a bill.
 import { supabase } from '../lib/supabase.js'
+import { setCardDue } from './cards.js'
 
 const PAID_KINDS = ['spend', 'card_payment']
 const dayOf = (iso) => (iso ? Number(iso.slice(8, 10)) : null)
@@ -30,12 +31,12 @@ export async function fetchBills() {
   return bills.data.map((b) => ({ ...b, kind: b.kind ?? 'spend', amount: Number(b.amount), lastPaid: lastPaid[b.id] ?? null }))
 }
 
-// The columns for one bill. Card payments have no budget item and always use their card.
-function row({ name, kind = 'spend', categoryId, amount, cardId, nextDue }) {
+// The columns for one bill.
+function row({ name, categoryId, amount, cardId, nextDue }) {
   return {
     name: name.trim(),
-    kind,
-    category_id: kind === 'card_payment' ? null : categoryId,
+    kind: 'spend',
+    category_id: categoryId,
     amount,
     card_id: cardId || null,
     next_due: nextDue || null,
@@ -44,7 +45,7 @@ function row({ name, kind = 'spend', categoryId, amount, cardId, nextDue }) {
 }
 
 export async function addBill(fields) {
-  const { error } = await supabase.from('bills').insert({ ...row(fields), sort_order: fields.sortOrder })
+  const { error } = await supabase.from('bills').insert({ ...row(fields), sort_order: fields.sortOrder ?? 0 })
   if (error) throw error
 }
 
@@ -80,7 +81,8 @@ export async function payBills(lines, paidOn) {
   return data
 }
 
-// Undo a payBills: remove its transactions and put each bill's due date back.
+// Undo a payBills / payCardBills: remove its transactions and put each due date back
+// (a bill's, or a card's).
 export async function unpayBills({ ids = [], pairs = [], due = [] }) {
   if (ids.length) {
     const { error } = await supabase.from('transactions').delete().in('id', ids)
@@ -90,7 +92,10 @@ export async function unpayBills({ ids = [], pairs = [], due = [] }) {
     const { error } = await supabase.from('transactions').delete().in('pair_id', pairs)
     if (error) throw error
   }
-  for (const d of due) await setBillDue(d.bill_id, d.prev)
+  for (const d of due) {
+    if (d.card_id) await setCardDue(d.card_id, d.prev)
+    else await setBillDue(d.bill_id, d.prev)
+  }
 }
 
 // A bill was paid outside the Bills screen (Quick spend, Pay card): move its due date on.
@@ -143,16 +148,17 @@ export async function fetchBillsForItem(categoryId) {
   return bills.data.map((b) => ({ ...b, amount: Number(b.amount), lastPaid: lastPaid[b.id] ?? null }))
 }
 
-// The card-payment bill for a card, if there is one (so Pay card can mark it paid).
-export async function fetchCardBill(cardId) {
+// The bills that come from these budget items (for the "This is a bill" switch in Setup).
+export async function fetchBillsForItems(categoryIds) {
+  if (categoryIds.length === 0) return []
   const { data, error } = await supabase
     .from('bills')
-    .select('id, name, amount, next_due')
-    .eq('kind', 'card_payment')
-    .eq('card_id', cardId)
-    .limit(1)
+    .select('id, name, category_id, amount, card_id, next_due, sort_order')
+    .in('category_id', categoryIds)
+    .order('sort_order')
+    .order('name')
   if (error) throw error
-  return data[0] ?? null
+  return data.map((b) => ({ ...b, amount: Number(b.amount) }))
 }
 
 // Tag a pair of transactions (card spend or card payment) with the bill it paid.
@@ -161,13 +167,15 @@ export async function tagPairWithBill(pairId, billId) {
   if (error) throw error
 }
 
-// Pay a card's bills in one go: each from its own envelope, then the card the total.
+// Pay a card's bills in one go: each from its own envelope, then the card payAmount
+// (the bills' total if left out). The card's due date moves on.
 // lines: [{ billId, amount }] — all charged to cardId. Returns { ids, pairs, due } for Undo.
-export async function payCardBills(cardId, lines, paidOn) {
+export async function payCardBills(cardId, lines, paidOn, payAmount) {
   const { data, error } = await supabase.rpc('pay_card_bills', {
     p_card_id: cardId,
     p_lines: lines.map((l) => ({ bill_id: l.billId, amount: l.amount })),
     p_paid_on: paidOn,
+    p_pay_amount: payAmount ?? null,
   })
   if (error) throw new Error(error.message)
   return data
