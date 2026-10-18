@@ -1223,3 +1223,20 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .donut-name { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
 .donut-nums { display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; white-space: nowrap; }
 .donut-plan { font-size: 12px; }
+
+/* ---- Activity: every entry in a month ---- */
+.activity-filters { display: grid; gap: 10px; margin: 4px 0 12px; }
+.activity-types { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.activity-types .chip { min-height: 34px; flex: none; }
+.activity-search { height: 42px; padding: 0 12px; border: 1px solid #cfcfc8; border-radius: 10px; background: #fafaf7; font: 400 16px var(--sans); color: var(--ink); }
+.activity-totals { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; font: 600 14px var(--sans); }
+.activity-list section { margin-bottom: 10px; }
+.activity-row { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 6px; }
+.activity-row--open { border-color: var(--accent); }
+.activity-main { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.activity-kind { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--bg); font: 600 14px var(--sans); color: var(--muted); }
+.activity-kind--income { background: var(--accent-soft); color: var(--accent); }
+.activity-amount { font-size: 14px; white-space: nowrap; }
+.activity-amount--in { color: var(--accent); font-weight: 600; }
+.activity-detail { display: grid; gap: 8px; padding: 0 12px 12px 48px; }
+.activity-totals { margin-bottom: 14px; }

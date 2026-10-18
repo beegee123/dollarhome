@@ -277,6 +277,9 @@ export default function BudgetScreen() {
           <Link to="/analytics" className="small-button">
             Analytics
           </Link>
+          <Link to="/activity" className="small-button">
+            Activity
+          </Link>
           <Link to="/setup" className="small-button">
             Setup
           </Link>

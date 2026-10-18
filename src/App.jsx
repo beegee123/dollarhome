@@ -15,6 +15,7 @@ import OwedScreen from './components/OwedScreen.jsx'
 import GuideScreen from './components/GuideScreen.jsx'
 import BillsScreen from './components/BillsScreen.jsx'
 import CategoriesScreen from './components/CategoriesScreen.jsx'
+import ActivityScreen from './components/ActivityScreen.jsx'
 
 // App decides WHICH screen to show: setup problem, loading, sign-in, or the app itself.
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
       <Route path="/" element={<BudgetScreen />} />
       <Route path="/wishlist" element={<WishlistScreen />} />
       <Route path="/analytics" element={<AnalyticsScreen />} />
+      <Route path="/activity" element={<ActivityScreen />} />
       <Route path="/owed" element={<OwedScreen />} />
       <Route path="/bills" element={<BillsScreen />} />
       <Route path="/guide" element={<GuideScreen />} />

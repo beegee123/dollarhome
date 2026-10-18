@@ -322,6 +322,15 @@ export default function GuideScreen() {
           </ul>
         </Section>
 
+        <Section title="Activity">
+          <ul>
+            <li>Budget → <strong>Activity</strong> lists everything logged in a month, newest first, grouped by day, one bank at a time; ‹ › changes the month.</li>
+            <li>Each thing you did is one row: a paycheck (tap it for its split), a move or transfer (from → to), an Assign (tap for the items it filled), a card spend (“on Visa”), a card payment, a spend.</li>
+            <li>Filter by Spends, Income, Moves or Card payments, or search notes and item names. The totals at the top follow what’s showing.</li>
+            <li>Tap a row, then <strong>Delete</strong> to take it back: the budget items it touched get their money back, and Undo puts it back. A loan or tax payment goes back on what’s owed (no Undo).</li>
+          </ul>
+        </Section>
+
         <Section title="Housekeeping">
           <ul>
             <li>Undo appears for 6 seconds after most actions. A past spend can be deleted from the item’s Recent list.</li>

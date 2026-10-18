@@ -228,3 +228,92 @@ async function fetchActivitySince(accountId, since) {
     .filter((r) => r.net !== 0)
     .sort((a, b) => (a.created < b.created ? 1 : -1))
 }
+
+// ---- Activity: everything logged in one month, across every account ----
+
+// One month's transactions and paychecks, plus the names to label them (archived ones too).
+// Supabase sends at most 1,000 rows at a time, so it keeps asking until a page comes back short.
+export async function fetchActivity(month) {
+  const first = `${month}-01`
+  const [y, m] = month.split('-').map(Number)
+  const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`
+  const page = async (build) => {
+    const out = []
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await build().range(from, from + 999)
+      if (error) throw error
+      out.push(...data)
+      if (data.length < 1000) return out
+    }
+  }
+  const [banks, accounts, categories, sources, transactions, events] = await Promise.all([
+    supabase.from('banks').select('id, name, currency, sort_order, archived').order('sort_order').order('name'),
+    supabase.from('accounts').select('id, bank_id, name, kind'),
+    supabase.from('categories').select('id, account_id, name, is_unassigned'),
+    supabase.from('income_sources').select('id, name, account_id'),
+    page(() =>
+      supabase
+        .from('transactions')
+        .select('id, category_id, amount, kind, note, occurred_on, created_at, pair_id, income_event_id, debt_id')
+        .gte('occurred_on', first)
+        .lt('occurred_on', next)
+        .order('occurred_on')
+        .order('id'),
+    ),
+    page(() => supabase.from('income_events').select('id, source_id, amount, received_on, note, created_at').gte('received_on', first).lt('received_on', next).order('received_on').order('id')),
+  ])
+  for (const r of [banks, accounts, categories, sources]) if (r.error) throw r.error
+  return {
+    banks: banks.data,
+    lookups: {
+      banks: Object.fromEntries(banks.data.map((b) => [b.id, b])),
+      accounts: Object.fromEntries(accounts.data.map((a) => [a.id, { name: a.name, kind: a.kind, bankId: a.bank_id }])),
+      cats: Object.fromEntries(categories.data.map((c) => [c.id, { name: c.name, accountId: c.account_id, isUnassigned: c.is_unassigned }])),
+      sources: Object.fromEntries(sources.data.map((s) => [s.id, { name: s.name, accountId: s.account_id }])),
+    },
+    transactions: transactions.map((t) => ({ ...t, amount: Number(t.amount) })),
+    events: events.map((e) => ({ ...e, amount: Number(e.amount) })),
+  }
+}
+
+// Delete one Activity row: a paycheck (its split goes with it), pairs, or single rows.
+// Returns what Undo needs to put the exact rows back, or null when it can't be undone here.
+export async function deleteActivity(del) {
+  if (del.debtPayment) {
+    // A loan or tax payment: unpay_debt also puts the amount back on what's owed.
+    const { error } = await supabase.rpc('unpay_debt', { p_transaction_id: del.debtPayment })
+    if (error) throw new Error(error.message)
+    return null
+  }
+  if (del.eventId) {
+    const [ev, tx] = await Promise.all([
+      supabase.from('income_events').select('*').eq('id', del.eventId).single(),
+      supabase.from('transactions').select('*').eq('income_event_id', del.eventId),
+    ])
+    if (ev.error) throw ev.error
+    if (tx.error) throw tx.error
+    const { error } = await supabase.from('income_events').delete().eq('id', del.eventId)
+    if (error) throw error
+    return { event: ev.data, rows: tx.data }
+  }
+  const query = del.pairs ? supabase.from('transactions').select('*').in('pair_id', del.pairs) : supabase.from('transactions').select('*').in('id', del.ids)
+  const { data: rows, error: readError } = await query
+  if (readError) throw readError
+  const { error } = del.pairs
+    ? await supabase.from('transactions').delete().in('pair_id', del.pairs)
+    : await supabase.from('transactions').delete().in('id', del.ids)
+  if (error) throw error
+  return { rows }
+}
+
+// Undo a deleteActivity: the same rows, same ids, back in place.
+export async function restoreActivity(saved) {
+  if (saved.event) {
+    const { error } = await supabase.from('income_events').insert(saved.event)
+    if (error) throw error
+  }
+  if (saved.rows.length) {
+    const { error } = await supabase.from('transactions').insert(saved.rows)
+    if (error) throw error
+  }
+}
