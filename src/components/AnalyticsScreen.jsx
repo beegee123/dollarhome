@@ -122,73 +122,41 @@ export default function AnalyticsScreen() {
             {figures.now.byGroup.length === 0 ? (
               <p className="card-sub">No spending or plans in {currency} for {monthLabel(month)}.</p>
             ) : (
-              <p className="card-sub">Tap a category for its last 6 months. Give items a category in Setup → the account → the item.</p>
+              <p className="card-sub">Each category’s share of the month’s spending. Tap a category for its last 6 months and its items.</p>
             )}
-            {(() => {
-              const max = Math.max(1, ...figures.now.byGroup.map((g) => Math.max(g.spent, g.plan)))
-              return figures.now.byGroup.map((g) => {
-                const over = g.plan > 0 && g.spent > g.plan
-                const open = openGroup === g.name
-                const label = `${g.name}: ${money(g.spent)} spent${g.plan > 0 ? ` of ${money(g.plan)} plan` : ''}${over ? `, over by ${money(g.spent - g.plan)}` : ''}`
-                return (
-                  <div key={g.name} className="group-block">
-                    <button type="button" className="spend-bar group-bar" aria-expanded={open} onClick={() => setOpenGroup(open ? null : g.name)} title={label}>
-                      <span className="spend-bar-top">
-                        <span className="spend-bar-name">
-                          {g.name} <span className="muted group-caret">{open ? '▾' : '▸'}</span>
-                        </span>
-                        <span className="spend-bar-nums">
-                          <span className="money">{money(g.spent)}</span>
-                          {g.plan > 0 && <span className="muted"> of {money(g.plan)}</span>}
-                          {over && <strong className="over-text"> over {money(g.spent - g.plan)}</strong>}
-                        </span>
-                      </span>
-                      <span className="spend-track" role="img" aria-label={label}>
-                        <span className={`spend-fill ${over ? 'spend-fill--over' : ''}`} style={{ width: `${(g.spent / max) * 100}%` }} />
-                        {g.plan > 0 && <span className="plan-tick" style={{ left: `${(g.plan / max) * 100}%` }} />}
-                      </span>
-                    </button>
-                    {open && (
-                      <div className="group-detail">
-                        <GroupTrend points={groupTrend(data, ctx, currency, month, g.name)} money={money} name={g.name} />
-                        <ul className="group-items">
-                          {g.envelopes.map((r) => (
-                            <li key={r.id}>
-                              <span>
-                                {r.name}
-                                {r.archived && <span className="muted"> (archived)</span>}
-                              </span>
-                              <span className="money">
-                                {money(r.spent)}
-                                {r.plan > 0 && <span className="muted"> of {money(r.plan)}</span>}
-                              </span>
-                            </li>
-                          ))}
-                          {g.loose > 0 && (
-                            <li>
-                              <span className="muted">Spent from Unassigned</span>
-                              <span className="money">{money(g.loose)}</span>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            })()}
             {figures.now.byGroup.length > 0 && (
-              <div className="legend">
-                <span>
-                  <span className="legend-tick" /> Plan
-                </span>
-                <span>
-                  <span className="legend-swatch" /> Spent
-                </span>
-                <span>
-                  <span className="legend-swatch legend-swatch--over" /> Over plan
-                </span>
-              </div>
+              <CategoryDonut
+                groups={figures.now.byGroup}
+                total={figures.now.spent}
+                money={money}
+                openGroup={openGroup}
+                onOpen={(name) => setOpenGroup(openGroup === name ? null : name)}
+                renderDetail={(g) => (
+                  <div className="group-detail">
+                    <GroupTrend points={groupTrend(data, ctx, currency, month, g.name)} money={money} name={g.name} />
+                    <ul className="group-items">
+                      {g.envelopes.map((r) => (
+                        <li key={r.id}>
+                          <span>
+                            {r.name}
+                            {r.archived && <span className="muted"> (archived)</span>}
+                          </span>
+                          <span className="money">
+                            {money(r.spent)}
+                            {r.plan > 0 && <span className="muted"> of {money(r.plan)}</span>}
+                          </span>
+                        </li>
+                      ))}
+                      {g.loose > 0 && (
+                        <li>
+                          <span className="muted">Spent from Unassigned</span>
+                          <span className="money">{money(g.loose)}</span>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              />
             )}
           </section>
 
@@ -219,10 +187,14 @@ export default function AnalyticsScreen() {
             ))}
           </section>
 
-          {/* 6. Top 5 envelopes */}
+          {/* 6. The 5 budget items spent from most */}
           <section className="card">
-            <h2>Top envelopes</h2>
-            {figures.now.top.length === 0 && <p className="card-sub">No spending logged in {monthLabel(month)}.</p>}
+            <h2>Biggest spends this month</h2>
+            <p className="card-sub">
+              {figures.now.top.length === 0
+                ? `No spending logged in ${monthLabel(month)}.`
+                : `The ${figures.now.top.length === 5 ? '5 budget items' : figures.now.top.length === 1 ? 'budget item' : `${figures.now.top.length} budget items`} you spent the most from in ${monthLabel(month)}, and their share of all spending.`}
+            </p>
             {figures.now.top.map((r, i) => {
               const max = figures.now.top[0].spent
               return (
@@ -315,6 +287,141 @@ function Glance({ f, prev, prevName, soFar, money }) {
         <Delta now={f.unspent} prev={prev.unspent} prevName={prevName} money={money} />
       </div>
     </section>
+  )
+}
+
+// Categories get a colour from this fixed order (checked for colour-blind separation);
+// beyond 6, the smallest fold into a grey "Everything else" (with Other).
+const SLICE_COLOURS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#6250d6']
+const REST_COLOUR = '#a3a39b'
+const MAX_SLICES = 6
+
+// Spending by category: a donut of each category's share, and a row per category under it
+// (amount, share, and against its plan). Tap a slice to see it in the middle; tap a row
+// for its last 6 months.
+function CategoryDonut({ groups, total, money, openGroup, onOpen, renderDetail }) {
+  const [active, setActive] = useState(null)
+  // The 6 biggest named categories get a colour; Other and anything smaller share the grey.
+  const spending = groups.filter((g) => g.spent > 0 && g.name !== 'Other').sort((a, b) => b.spent - a.spent)
+  const shown = spending.slice(0, MAX_SLICES)
+  const rest = [...spending.slice(MAX_SLICES), ...groups.filter((g) => g.name === 'Other' && g.spent > 0)]
+  const restName = rest.length === 1 ? rest[0].name : 'Everything else'
+  // Colour follows the category (your list's order), not its size.
+  const colourOf = {}
+  groups.filter((g) => shown.includes(g)).forEach((g, i) => (colourOf[g.name] = SLICE_COLOURS[i]))
+  const slices = [
+    ...shown.map((g) => ({ name: g.name, value: g.spent, colour: colourOf[g.name] })),
+    ...(rest.length ? [{ name: restName, value: rest.reduce((n, g) => n + g.spent, 0), colour: REST_COLOUR, members: rest.map((g) => g.name) }] : []),
+  ]
+  const pct = (v) => (total > 0 ? Math.round((v / total) * 100) : 0)
+  const focus = slices.find((s) => s.name === active)
+
+  const R = 78
+  const STROKE = 26
+  const C = 100
+  let angle = -Math.PI / 2
+  const arcs = slices.map((s) => {
+    const sweep = total > 0 ? (s.value / total) * Math.PI * 2 : 0
+    const a0 = angle
+    angle += sweep
+    return { ...s, a0, a1: angle }
+  })
+  const point = (a, r = R) => [C + r * Math.cos(a), C + r * Math.sin(a)]
+  const arcPath = (a0, a1) => {
+    if (a1 - a0 >= Math.PI * 2 - 0.0001) return `M${C} ${C - R}A${R} ${R} 0 1 1 ${C - 0.01} ${C - R}`
+    const [x0, y0] = point(a0)
+    const [x1, y1] = point(a1)
+    return `M${x0} ${y0}A${R} ${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`
+  }
+
+  return (
+    <div className="donut-wrap">
+      {total > 0 && (
+        <div className="donut">
+          <svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Spending by category, as shares of the month">
+            {arcs.map((a) => (
+              <path
+                key={a.name}
+                d={arcPath(a.a0, a.a1)}
+                className={`donut-slice ${active && active !== a.name ? 'donut-slice--dim' : ''}`}
+                stroke={a.colour}
+                strokeWidth={active === a.name ? STROKE + 6 : STROKE}
+                onClick={() => setActive(active === a.name ? null : a.name)}
+              >
+                <title>{`${a.name}: ${money(a.value)} · ${pct(a.value)}%`}</title>
+              </path>
+            ))}
+            {/* 2px gaps between slices, in the card's colour */}
+            {arcs.length > 1 &&
+              arcs.map((a) => {
+                const [x0, y0] = point(a.a0, R - STROKE / 2 - 4)
+                const [x1, y1] = point(a.a0, R + STROKE / 2 + 4)
+                return <line key={`gap-${a.name}`} x1={x0} y1={y0} x2={x1} y2={y1} className="donut-gap" />
+              })}
+            <text x={C} y={C - 6} textAnchor="middle" className="donut-label">
+              {focus ? focus.name : 'Spent'}
+            </text>
+            <text x={C} y={C + 16} textAnchor="middle" className="donut-total">
+              {money(focus ? focus.value : total)}
+            </text>
+            {focus && (
+              <text x={C} y={C + 34} textAnchor="middle" className="donut-label">
+                {pct(focus.value)}%
+              </text>
+            )}
+          </svg>
+        </div>
+      )}
+      <div className="donut-rows">
+        {groups.map((g) => {
+          const over = g.plan > 0 && g.spent > g.plan
+          const open = openGroup === g.name
+          const colour = colourOf[g.name] ?? (g.spent > 0 ? REST_COLOUR : 'transparent')
+          const lit = active && (active === g.name || focus?.members?.includes(g.name))
+          return (
+            <div key={g.name} className="group-block">
+              <button type="button" className={`donut-row ${lit ? 'donut-row--lit' : ''}`} aria-expanded={open} onClick={() => onOpen(g.name)}>
+                <span className="donut-dot" style={{ background: colour, borderColor: g.spent > 0 ? colour : 'var(--line)' }} />
+                <span className="donut-name">
+                  {g.name} <span className="muted group-caret">{open ? '▾' : '▸'}</span>
+                </span>
+                <span className="donut-nums">
+                  <span>
+                    <span className="money">{money(g.spent)}</span>
+                    {total > 0 && g.spent > 0 && <span className="muted"> · {pct(g.spent)}%</span>}
+                  </span>
+                  <span className="donut-plan">
+                    {g.plan > 0 ? (
+                      over ? (
+                        <strong className="over-text">over by {money(g.spent - g.plan)}</strong>
+                      ) : (
+                        <span className="muted">of {money(g.plan)} plan</span>
+                      )
+                    ) : (
+                      <span className="muted">no plan</span>
+                    )}
+                  </span>
+                </span>
+              </button>
+              {open && renderDetail(g)}
+            </div>
+          )
+        })}
+      </div>
+      <table className="visually-hidden">
+        <caption>Spending by category</caption>
+        <tbody>
+          {groups.map((g) => (
+            <tr key={g.name}>
+              <th scope="row">{g.name}</th>
+              <td>{money(g.spent)}</td>
+              <td>{pct(g.spent)}%</td>
+              <td>{g.plan > 0 ? `plan ${money(g.plan)}` : 'no plan'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

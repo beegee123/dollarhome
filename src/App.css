@@ -1207,3 +1207,19 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .group-edit-link { font: 600 13px var(--sans); color: var(--accent); text-transform: none; letter-spacing: 0; text-decoration: none; }
 .group-edit { display: grid; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .empty--small .small-button { margin-top: 6px; }
+/* Spending by category: donut + rows */
+.donut-wrap { display: grid; gap: 10px; }
+.donut { display: flex; justify-content: center; }
+.donut svg { max-width: 220px; width: 100%; height: auto; }
+.donut-slice { fill: none; cursor: pointer; transition: opacity 0.15s, stroke-width 0.15s; }
+.donut-slice--dim { opacity: 0.35; }
+.donut-gap { stroke: var(--card); stroke-width: 2; pointer-events: none; }
+.donut-label { font: 500 12px var(--sans); fill: var(--muted); }
+.donut-total { font: 600 19px var(--mono); fill: var(--ink); }
+.donut-rows { display: grid; gap: 2px; }
+.donut-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; padding: 8px 6px; border: 0; border-radius: 10px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.donut-row--lit { background: var(--accent-soft); }
+.donut-dot { width: 12px; height: 12px; margin-top: 4px; border-radius: 4px; border: 1.5px solid; }
+.donut-name { font-weight: 500; font-size: 14px; overflow-wrap: anywhere; }
+.donut-nums { display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; white-space: nowrap; }
+.donut-plan { font-size: 12px; }

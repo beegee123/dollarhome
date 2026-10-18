@@ -313,9 +313,9 @@ export default function GuideScreen() {
             <li><strong>Funded</strong>: how much of your monthly plans got money this month (paycheck splits, Assign, Move), and what they still need. Each item counts up to its plan.</li>
             <li><strong>Unspent in envelopes</strong>: what your budget items hold at the end of the month, with Unassigned beside it. Card payment envelopes aren’t counted.</li>
             <li>▲/▼ under each figure compares with the month before.</li>
-            <li><strong>Spending by category</strong>: in the order of your list (Setup → Categories). The tick is the plan; amber went over. Tap a category for its last 6 months and its items.</li>
+            <li><strong>Spending by category</strong>: a donut of each category’s share of the month’s spending, with the total in the middle. The six biggest get a colour; Other and the smaller ones share the grey. Tap a slice to see its amount and share. Under it, each category in your list’s order (Setup → Categories): amount, share, and “of C$X plan” or “over by C$X”. Tap a row for its last 6 months and its items.</li>
             <li><strong>Categories</strong>: Setup → Categories holds your list (it starts with a suggested one). Add, rename (every item follows), move up or down, or delete (its items go back to Other). Give a budget item its category in Setup → the account → tap the item → tap a category; tap it again to clear. Items without one show as Other.</li>
-            <li><strong>Over plan</strong> lists items that spent more than their plan, and how many are on or under. <strong>Top envelopes</strong> are the five that spent most.</li>
+            <li><strong>Over plan</strong> lists items that spent more than their plan, and how many are on or under. <strong>Biggest spends this month</strong> are the five budget items you spent the most from, with each one’s share of all spending.</li>
             <li><strong>Income vs spent</strong>: the last 6 months side by side; tap a month for its numbers.</li>
             <li>Lower down: income by source, Owed progress, and Wishlist progress.</li>
             <li>Plans are as they are today, so an earlier month is measured against today’s plans.</li>
