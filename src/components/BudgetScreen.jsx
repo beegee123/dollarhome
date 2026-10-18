@@ -277,9 +277,6 @@ export default function BudgetScreen() {
           <Link to="/analytics" className="small-button">
             Analytics
           </Link>
-          <Link to="/activity" className="small-button">
-            Activity
-          </Link>
           <Link to="/setup" className="small-button">
             Setup
           </Link>
@@ -328,6 +325,7 @@ export default function BudgetScreen() {
 
           <SearchBox value={query} onChange={setQuery} />
 
+          <div className="bank-line-row">
           <p className="bank-line muted">
             {search
               ? 'Results across all banks'
@@ -340,6 +338,13 @@ export default function BudgetScreen() {
                   bank.currency,
                 )}`}
           </p>
+            {/* Everything logged at this bank this month, newest first. */}
+            {!search && bank && (
+              <Link to={`/activity?bank=${bank.id}`} className="bank-activity-link">
+                Activity ›
+              </Link>
+            )}
+          </div>
 
           {/* Transfers to make in your real bank after a paycheck. Tap ✓ once done. */}
           {reminders.map((m) => (

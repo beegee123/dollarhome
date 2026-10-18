@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { deleteActivity, fetchActivity, restoreActivity } from '../api/transactions.js'
 import { groupActivity } from '../lib/activity.js'
 import { monthKey, shiftMonth } from '../lib/analytics.js'
@@ -13,7 +13,7 @@ const TYPES = [
   { id: 'spend', label: 'Spends' },
   { id: 'income', label: 'Income' },
   { id: 'move', label: 'Moves' },
-  { id: 'card', label: 'Card payments' },
+  { id: 'card', label: 'Card pay' },
 ]
 
 // "Fri, Oct 17"
@@ -23,9 +23,11 @@ function dayLabel(iso) {
   return `${DAYS[date.getDay()]}, ${MONTHS_LONG[m - 1].slice(0, 3)} ${d}`
 }
 
-// Activity: everything logged in a month, newest first, one bank at a time.
-// Address: /activity
+// Activity: everything logged in a month at one bank, newest first.
+// Address: /activity?bank=<id> (from the bank's tab on Budget). Without a bank, bank tabs show.
 export default function ActivityScreen() {
+  const [params] = useSearchParams()
+  const fixedBank = params.get('bank')
   const thisMonth = monthKey(new Date())
   const [month, setMonth] = useState(thisMonth)
   const [data, setData] = useState(null)
@@ -49,7 +51,9 @@ export default function ActivityScreen() {
         if (ignore) return
         setData(d)
         setLoadError(null)
-        setBankId((id) => (d.banks.some((b) => b.id === id && !b.archived) ? id : (d.banks.find((b) => !b.archived)?.id ?? null)))
+        setBankId((id) =>
+          d.banks.some((b) => b.id === fixedBank) ? fixedBank : d.banks.some((b) => b.id === id && !b.archived) ? id : (d.banks.find((b) => !b.archived)?.id ?? null),
+        )
       })
       .catch((err) => !ignore && setLoadError(friendlyError(err)))
     return () => {
@@ -119,7 +123,7 @@ export default function ActivityScreen() {
         <Link to="/" className="back-link">
           ← Budget
         </Link>
-        <span className="eyebrow">DOLLARHOME</span>
+        <span className="eyebrow">{fixedBank && bank ? `${bank.name.toUpperCase()} · ${bank.currency}` : 'DOLLARHOME'}</span>
         <div className="analytics-title">
           <h1>Activity</h1>
           <div className="month-picker">
@@ -137,7 +141,7 @@ export default function ActivityScreen() {
         </div>
       </header>
 
-      {banks.length > 1 && (
+      {!fixedBank && banks.length > 1 && (
         <div className="bank-tabs" role="tablist" aria-label="Banks">
           {banks.map((b) => (
             <button key={b.id} type="button" role="tab" aria-selected={b.id === bankId} className="bank-tab" onClick={() => setBankId(b.id)}>

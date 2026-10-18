@@ -1226,8 +1226,8 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 
 /* ---- Activity: every entry in a month ---- */
 .activity-filters { display: grid; gap: 10px; margin: 4px 0 12px; }
-.activity-types { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.activity-types .chip { min-height: 34px; flex: none; }
+.activity-types { flex-wrap: wrap; gap: 6px; }
+.activity-types .chip { min-height: 34px; padding: 0 12px; }
 .activity-search { height: 42px; padding: 0 12px; border: 1px solid #cfcfc8; border-radius: 10px; background: #fafaf7; font: 400 16px var(--sans); color: var(--ink); }
 .activity-totals { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; font: 600 14px var(--sans); }
 .activity-list section { margin-bottom: 10px; }
@@ -1240,3 +1240,7 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .activity-amount--in { color: var(--accent); font-weight: 600; }
 .activity-detail { display: grid; gap: 8px; padding: 0 12px 12px 48px; }
 .activity-totals { margin-bottom: 14px; }
+.bank-line-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.bank-line-row .bank-line { min-width: 0; }
+.bank-activity-link { flex: none; font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.activity-search { width: 100%; min-width: 0; }
