@@ -308,6 +308,7 @@ export default function GuideScreen() {
 
         <Section title="Analytics">
           <ul>
+            <li>Open it with the small bar-chart button at the top of Budget, next to Setup.</li>
             <li>One currency (USD or CAD, all its banks together) and one month at a time; ‹ › steps back up to a year. This month shows “so far”.</li>
             <li><strong>Kept</strong>: income minus spending, with each side shown. Card spends count when you log them.</li>
             <li><strong>Funded</strong>: how much of your monthly plans got money this month (paycheck splits, Assign, Move), and what they still need. Each item counts up to its plan.</li>

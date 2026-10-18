@@ -274,8 +274,14 @@ export default function BudgetScreen() {
           <Link to="/wishlist" className="small-button">
             Wishlist
           </Link>
-          <Link to="/analytics" className="small-button">
-            Analytics
+          <Link to="/analytics" className="small-button analytics-icon" aria-label="Analytics" title="Analytics">
+            {/* a small bar chart */}
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M2 16h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <rect x="3.5" y="9" width="2.6" height="5.5" rx="1" fill="currentColor" />
+              <rect x="7.7" y="4.5" width="2.6" height="10" rx="1" fill="currentColor" />
+              <rect x="11.9" y="7" width="2.6" height="7.5" rx="1" fill="currentColor" />
+            </svg>
           </Link>
           <Link to="/setup" className="small-button">
             Setup

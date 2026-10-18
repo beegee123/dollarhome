@@ -1244,3 +1244,4 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bank-line-row .bank-line { min-width: 0; }
 .bank-activity-link { flex: none; font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: none; }
 .activity-search { width: 100%; min-width: 0; }
+.analytics-icon { min-width: 36px; padding: 0 9px; color: var(--ink); }
