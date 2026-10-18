@@ -1166,3 +1166,40 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bill-switch .spend-row > * { min-width: 0; }
 .bill-switch input[type='date'] { width: 100%; min-width: 0; }
 .edit-word { white-space: nowrap; }
+
+/* ---- Analytics: the month at a glance, category bars, income vs spent ---- */
+.glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { display: flex; flex-direction: column; gap: 3px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); min-width: 0; }
+.stat--wide { grid-column: 1 / -1; }
+.stat-label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.stat-value { font: 600 24px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.stat--wide .stat-value { font-size: 30px; }
+.stat-sub { font-size: 13px; color: var(--muted); }
+.stat-deltas { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.delta { font-size: 12px; color: var(--muted); }
+.card-head-note { font-size: 13px; }
+.group-block { display: flex; flex-direction: column; gap: 8px; }
+.group-bar { width: 100%; padding: 4px 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.group-caret { font-size: 11px; }
+.group-detail { padding: 10px 12px; border-radius: 12px; background: var(--bg); display: grid; gap: 8px; }
+.group-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.group-items li, .list-row { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.group-items li { font-size: 13px; }
+.list-row .money { white-space: nowrap; font-size: 13px; }
+.chart-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0 0 6px; font-size: 13px; }
+.chart-readout--small { margin: 0; }
+.key-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
+.key-swatch--income { background: #1baf7a; }
+.key-swatch--spent { background: #2a78d6; }
+.bar--income { fill: #1baf7a; }
+.bar--spent { fill: #2a78d6; }
+.bar--group { fill: var(--accent); opacity: 0.75; }
+.bar--group.bar--focus { opacity: 1; }
+.bar--over { fill: var(--low); }
+.bar-focus { fill: var(--bg); }
+.plan-line { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.trend-month--on { fill: var(--ink); font-weight: 700; }
+.group-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.group-chips .chip { padding: 4px 10px; font-size: 13px; }
+.item-group { color: var(--ink); }
+.group-chips .chip { min-height: 32px; }

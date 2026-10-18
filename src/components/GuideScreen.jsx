@@ -308,9 +308,16 @@ export default function GuideScreen() {
 
         <Section title="Analytics">
           <ul>
-            <li>One bank and one month at a time; ‹ › steps back up to a year.</li>
-            <li>Where it went: spending per item, with a tick at the monthly plan; amber went over.</li>
-            <li>Income by source, a 6-month spending line, Owed progress, and Wishlist progress.</li>
+            <li>One currency (USD or CAD, all its banks together) and one month at a time; ‹ › steps back up to a year. This month shows “so far”.</li>
+            <li><strong>Kept</strong>: income minus spending, with each side shown. Card spends count when you log them.</li>
+            <li><strong>Funded</strong>: how much of your monthly plans got money this month (paycheck splits, Assign, Move), and what they still need. Each item counts up to its plan.</li>
+            <li><strong>Unspent in envelopes</strong>: what your budget items hold at the end of the month, with Unassigned beside it. Card payment envelopes aren’t counted.</li>
+            <li>▲/▼ under each figure compares with the month before.</li>
+            <li><strong>Spending by category</strong>: give each budget item a category in Setup → the account → the item (pick one you’ve used or type a new one). Items without one show as Other. The tick is the plan; amber went over. Tap a category for its last 6 months and its items.</li>
+            <li><strong>Over plan</strong> lists items that spent more than their plan, and how many are on or under. <strong>Top envelopes</strong> are the five that spent most.</li>
+            <li><strong>Income vs spent</strong>: the last 6 months side by side; tap a month for its numbers.</li>
+            <li>Lower down: income by source, Owed progress, and Wishlist progress.</li>
+            <li>Plans are as they are today, so an earlier month is measured against today’s plans.</li>
           </ul>
         </Section>
 

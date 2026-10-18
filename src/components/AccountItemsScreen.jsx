@@ -70,7 +70,7 @@ export default function AccountItemsScreen() {
   }
   if (data === null) return <div className="screen center-message muted">Loading…</div>
 
-  const { account, items, unassigned, total, siblings, cards, bills } = data
+  const { account, items, unassigned, total, siblings, cards, bills, groups } = data
   const billsByItem = {}
   bills.forEach((b) => (billsByItem[b.category_id] ??= []).push(b))
   const currency = account.bank.currency
@@ -91,13 +91,17 @@ export default function AccountItemsScreen() {
   // Save a budget item, then its bill: "This is a bill" on → add or update it (named after
   // the item, the amount following the plan); off → remove it (past payments stay).
   async function saveItemAndBill(itemId, f, before) {
-    const id = itemId ?? (await addItem({ accountId, name: f.name, plannedAmount: f.plannedAmount, targetType: f.targetType, targetDate: f.targetDate, sortOrder: nextOrder }))
+    const id =
+      itemId ??
+      (await addItem({ accountId, name: f.name, plannedAmount: f.plannedAmount, targetType: f.targetType, targetDate: f.targetDate, sortOrder: nextOrder, categoryGroup: f.categoryGroup }))
     if (itemId) {
       await updateItem(itemId, {
         name: f.name,
         planned_amount: f.plannedAmount,
         target_type: f.targetType,
         target_date: f.targetType === 'by_date' ? f.targetDate : null,
+        // Only sent when it changed, so this still saves before 021_categories.sql has run.
+        ...(f.categoryGroup !== (before?.category_group ?? null) ? { category_group: f.categoryGroup } : {}),
       })
     }
     const bill = itemId ? billsByItem[itemId]?.[0] : null
@@ -230,6 +234,7 @@ export default function AccountItemsScreen() {
               currency={currency}
               initial={item}
               cards={cards}
+              groups={groups}
               bills={billsByItem[item.id] ?? []}
               submitLabel="Save"
               busy={busy}
@@ -282,6 +287,7 @@ export default function AccountItemsScreen() {
               <span className="setup-row-main">
                 <span className="setup-row-name">{item.name}</span>
                 <span className="muted setup-row-sub">
+                  {item.category_group && <span className="item-group">{item.category_group} · </span>}
                   {item.target_type === 'by_date' && item.target_date ? (
                     <>
                       Goal <span className="money">{formatMoney(item.planned_amount, currency)}</span> by{' '}
@@ -306,7 +312,7 @@ export default function AccountItemsScreen() {
           ),
         )}
 
-        <AddItem currency={currency} cards={cards} busy={busy} onAdd={(f) => run(() => saveItemAndBill(null, f, null))} />
+        <AddItem currency={currency} cards={cards} groups={groups} busy={busy} onAdd={(f) => run(() => saveItemAndBill(null, f, null))} />
 
         {archived.length > 0 && (
           <details className="archived">
@@ -400,7 +406,7 @@ export default function AccountItemsScreen() {
   )
 }
 
-function AddItem({ currency, cards, busy, onAdd }) {
+function AddItem({ currency, cards, groups, busy, onAdd }) {
   const [open, setOpen] = useState(false)
   if (!open) {
     return (
@@ -414,6 +420,7 @@ function AddItem({ currency, cards, busy, onAdd }) {
       currency={currency}
       initial={null}
       cards={cards}
+      groups={groups}
       bills={[]}
       submitLabel="Add item"
       busy={busy}
@@ -427,12 +434,13 @@ function AddItem({ currency, cards, busy, onAdd }) {
 
 // Name + target. Used for adding and for editing.
 // Target: Monthly (aim to have this much each month) or Save up to an amount by a date.
-function ItemForm({ currency, initial, cards = [], bills = [], submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
+function ItemForm({ currency, initial, cards = [], groups = [], bills = [], submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
   const bill = bills[0] ?? null
   const [isBill, setIsBill] = useState(!!bill)
   const [paidWith, setPaidWith] = useState(bill?.card_id ?? '')
   const [billDue, setBillDue] = useState(bill?.next_due ?? '')
   const [name, setName] = useState(initial?.name ?? '')
+  const [group, setGroup] = useState(initial?.category_group ?? '')
   const [planText, setPlanText] = useState(initial ? String(initial.planned_amount) : '')
   const [targetType, setTargetType] = useState(initial?.target_type ?? 'monthly')
   const [targetDate, setTargetDate] = useState(initial?.target_date ?? '')
@@ -467,6 +475,8 @@ function ItemForm({ currency, initial, cards = [], bills = [], submitLabel, busy
         setError(null)
         const ok = await onSubmit({
           name: name.trim(),
+          // Match an existing category's spelling ("utilities" → "Utilities").
+          categoryGroup: group.trim() ? (groups.find((g) => g.toLowerCase() === group.trim().toLowerCase()) ?? group.trim()) : null,
           plannedAmount: plan,
           targetType,
           targetDate: isGoal ? targetDate : null,
@@ -474,6 +484,7 @@ function ItemForm({ currency, initial, cards = [], bills = [], submitLabel, busy
         })
         if (ok && clearAfterSubmit) {
           setName('')
+          setGroup('')
           setPlanText('')
           setTargetType('monthly')
           setTargetDate('')
@@ -487,6 +498,36 @@ function ItemForm({ currency, initial, cards = [], bills = [], submitLabel, busy
         <span>Name</span>
         <input placeholder="e.g. Groceries" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
       </label>
+
+      <label className="field">
+        <span>Category (for Analytics)</span>
+        <input
+          placeholder="e.g. Utilities, Food, Housing"
+          value={group}
+          maxLength={40}
+          list={`groups-${initial?.id ?? 'new'}`}
+          onChange={(e) => setGroup(e.target.value)}
+        />
+        <datalist id={`groups-${initial?.id ?? 'new'}`}>
+          {groups.map((g) => (
+            <option key={g} value={g} />
+          ))}
+        </datalist>
+      </label>
+      {groups.length > 0 && (
+        <div className="group-chips" aria-label="Categories you've used">
+          {groups.map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={`chip ${group.trim().toLowerCase() === g.toLowerCase() ? 'on' : ''}`}
+              onClick={() => setGroup(group.trim().toLowerCase() === g.toLowerCase() ? '' : g)}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
 
       <fieldset className="segmented">
         <legend>Target</legend>
@@ -539,7 +580,7 @@ function ItemForm({ currency, initial, cards = [], bills = [], submitLabel, busy
               <label className="field">
                 <span>Paid with</span>
                 <select value={paidWith} onChange={(e) => setPaidWith(e.target.value)} className="field-select">
-                  <option value="">Bank account (debit)</option>
+                  <option value="">Debit</option>
                   {cards.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} (card)
