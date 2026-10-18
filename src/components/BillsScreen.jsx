@@ -19,6 +19,7 @@ export default function BillsScreen() {
   const [setupOpen, setSetupOpen] = useState(false) // the all-budget-items grid
   const [quick, setQuick] = useState(null) // { id, amount, due } while updating a bill's amount / due date
   const [busy, setBusy] = useState(false)
+  const [tabBank, setTabBank] = useState(null) // bank name of the open tab
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   const [reloadCount, setReloadCount] = useState(0)
@@ -113,7 +114,7 @@ export default function BillsScreen() {
   bankBills.forEach((b) => {
     const env = envOf(b)
     const key = env?.bankName ?? 'Other'
-    ;(bankGroups[key] ??= { key: `bank-${key}`, title: `From ${key}`, currency: env?.currency ?? 'USD', bills: [] }).bills.push(b)
+    ;(bankGroups[key] ??= { key: `bank-${key}`, bankName: key, title: `From ${key}`, currency: env?.currency ?? 'USD', bills: [] }).bills.push(b)
   })
   // A group's total, and what's still to pay this month (not yet paid this month).
   const totals = (list) => {
@@ -126,9 +127,27 @@ export default function BillsScreen() {
     ...cardIds.map((id) => {
       const own = sorted.find((b) => b.kind === 'card_payment' && b.card_id === id)
       const charged = sorted.filter((b) => b.kind === 'spend' && b.card_id === id)
-      return { key: id, card: cards[id], own, charged, bills: [...(own ? [own] : []), ...charged], currency: cards[id]?.currency ?? 'USD', ...totals(charged) }
+      return { key: id, card: cards[id], bankName: cards[id]?.bankName ?? 'Other', own, charged, bills: [...(own ? [own] : []), ...charged], currency: cards[id]?.currency ?? 'USD', ...totals(charged) }
     }),
   ]
+
+  // One tab per bank: its bills paid from the bank, then its own cards. A card's bills sit
+  // under the card's bank, since that's where the card is paid.
+  const bankOrder = (banks ?? []).map((b) => b.name)
+  const tabNames = [...new Set(sections.map((sec) => sec.bankName))].sort(
+    (a, b) => (bankOrder.indexOf(a) + 1 || 999) - (bankOrder.indexOf(b) + 1 || 999),
+  )
+  const openTab = tabNames.includes(tabBank) ? tabBank : tabNames[0]
+  const shownSections = tabNames.length > 1 ? sections.filter((sec) => sec.bankName === openTab) : sections
+  const tabTotal = shownSections.reduce((n, sec) => n + (sec.total ?? 0), 0)
+  const tabLeft = shownSections.reduce((n, sec) => n + (sec.left ?? 0), 0)
+  const tabCurrency = shownSections[0]?.currency ?? 'USD'
+
+  function openBankTab(name) {
+    // Each tab stands on its own: switching clears ticks so Log only covers what you see.
+    setTabBank(name)
+    setSelected({})
+  }
 
   // Ticked bills that are all charged to one card can be logged AND the card paid, in one go.
   const oneCard =
@@ -254,7 +273,31 @@ export default function BillsScreen() {
           </p>
         )}
 
-        {sections.map((sec) => (
+        {tabNames.length > 1 && (
+          <div className="bank-tabs" role="tablist" aria-label="Banks">
+            {tabNames.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={name === openTab}
+                className="bank-tab"
+                onClick={() => openBankTab(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
+        {tabNames.length > 1 && tabTotal > 0 && (
+          <p className="bills-tab-total">
+            <span className="money">{formatMoney(tabTotal, tabCurrency)}</span> this month
+            {tabLeft > 0 && tabLeft < tabTotal && <span className="muted"> · {formatMoney(tabLeft, tabCurrency)} left</span>}
+            {tabLeft === 0 && <span className="match-ok"> · all paid</span>}
+          </p>
+        )}
+
+        {shownSections.map((sec) => (
           <section key={sec.key} className="bill-section" aria-label={sec.title ?? `On ${sec.card?.name ?? 'card'}`}>
             {sec.card !== undefined && (
               <div className="bill-section-head">
@@ -589,24 +632,29 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
 
       {tabBanks.length > 1 && (
         <div className="bank-tabs" role="tablist" aria-label="Banks">
-          {tabBanks.map((b) => {
-            const sum = groups.filter((g) => g.bank.id === b.id).reduce((n, g) => n + sumFor(g.account), 0)
-            return (
-              <button
-                key={b.id}
-                type="button"
-                role="tab"
-                aria-selected={b.id === bankId}
-                className="bank-tab"
-                onClick={() => setBankId(b.id)}
-              >
-                {b.name}
-                {sum > 0 && <span className="bank-tab-sum"> · {formatMoney(sum, b.currency)}</span>}
-              </button>
-            )
-          })}
+          {tabBanks.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              role="tab"
+              aria-selected={b.id === bankId}
+              className="bank-tab"
+              onClick={() => setBankId(b.id)}
+            >
+              {b.name}
+            </button>
+          ))}
         </div>
       )}
+      {(() => {
+        const bank = tabBanks.find((b) => b.id === bankId)
+        const sum = shown.reduce((n, g) => n + sumFor(g.account), 0)
+        return bank && sum > 0 ? (
+          <p className="bills-tab-total">
+            {bank.name} bills: <span className="money">{formatMoney(sum, bank.currency)}</span> a month
+          </p>
+        ) : null
+      })()}
 
       <div className="split-groups">
         {shown.map(({ bank, account }) => {

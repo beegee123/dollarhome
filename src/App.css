@@ -1153,3 +1153,4 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bill-section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
 .bill-group-total { font: 600 13px var(--sans); text-transform: none; letter-spacing: 0; color: var(--ink); white-space: nowrap; }
 .bill-section-head { flex-wrap: wrap; }
+.bills-tab-total { margin: 4px 0 12px; font: 600 14px var(--sans); color: var(--ink); }
