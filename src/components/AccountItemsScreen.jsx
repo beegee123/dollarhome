@@ -71,6 +71,7 @@ export default function AccountItemsScreen() {
   if (data === null) return <div className="screen center-message muted">Loading…</div>
 
   const { account, items, unassigned, total, siblings, cards, bills, groups } = data
+  const groupName = Object.fromEntries((groups ?? []).map((g) => [g.id, g.name]))
   const billsByItem = {}
   bills.forEach((b) => (billsByItem[b.category_id] ??= []).push(b))
   const currency = account.bank.currency
@@ -93,15 +94,15 @@ export default function AccountItemsScreen() {
   async function saveItemAndBill(itemId, f, before) {
     const id =
       itemId ??
-      (await addItem({ accountId, name: f.name, plannedAmount: f.plannedAmount, targetType: f.targetType, targetDate: f.targetDate, sortOrder: nextOrder, categoryGroup: f.categoryGroup }))
+      (await addItem({ accountId, name: f.name, plannedAmount: f.plannedAmount, targetType: f.targetType, targetDate: f.targetDate, sortOrder: nextOrder, groupId: f.groupId }))
     if (itemId) {
       await updateItem(itemId, {
         name: f.name,
         planned_amount: f.plannedAmount,
         target_type: f.targetType,
         target_date: f.targetType === 'by_date' ? f.targetDate : null,
-        // Only sent when it changed, so this still saves before 021_categories.sql has run.
-        ...(f.categoryGroup !== (before?.category_group ?? null) ? { category_group: f.categoryGroup } : {}),
+        // Only sent when it changed, so this still saves before 022_category_list.sql has run.
+        ...(f.groupId !== (before?.group_id ?? null) ? { group_id: f.groupId } : {}),
       })
     }
     const bill = itemId ? billsByItem[itemId]?.[0] : null
@@ -287,7 +288,7 @@ export default function AccountItemsScreen() {
               <span className="setup-row-main">
                 <span className="setup-row-name">{item.name}</span>
                 <span className="muted setup-row-sub">
-                  {item.category_group && <span className="item-group">{item.category_group} · </span>}
+                  {groupName[item.group_id] && <span className="item-group">{groupName[item.group_id]} · </span>}
                   {item.target_type === 'by_date' && item.target_date ? (
                     <>
                       Goal <span className="money">{formatMoney(item.planned_amount, currency)}</span> by{' '}
@@ -434,13 +435,13 @@ function AddItem({ currency, cards, groups, busy, onAdd }) {
 
 // Name + target. Used for adding and for editing.
 // Target: Monthly (aim to have this much each month) or Save up to an amount by a date.
-function ItemForm({ currency, initial, cards = [], groups = [], bills = [], submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
+function ItemForm({ currency, initial, cards = [], groups, bills = [], submitLabel, busy, onSubmit, onCancel, clearAfterSubmit, extra }) {
   const bill = bills[0] ?? null
   const [isBill, setIsBill] = useState(!!bill)
   const [paidWith, setPaidWith] = useState(bill?.card_id ?? '')
   const [billDue, setBillDue] = useState(bill?.next_due ?? '')
   const [name, setName] = useState(initial?.name ?? '')
-  const [group, setGroup] = useState(initial?.category_group ?? '')
+  const [groupId, setGroupId] = useState(initial?.group_id ?? null)
   const [planText, setPlanText] = useState(initial ? String(initial.planned_amount) : '')
   const [targetType, setTargetType] = useState(initial?.target_type ?? 'monthly')
   const [targetDate, setTargetDate] = useState(initial?.target_date ?? '')
@@ -475,8 +476,7 @@ function ItemForm({ currency, initial, cards = [], groups = [], bills = [], subm
         setError(null)
         const ok = await onSubmit({
           name: name.trim(),
-          // Match an existing category's spelling ("utilities" → "Utilities").
-          categoryGroup: group.trim() ? (groups.find((g) => g.toLowerCase() === group.trim().toLowerCase()) ?? group.trim()) : null,
+          groupId: groups?.some((g) => g.id === groupId) ? groupId : null,
           plannedAmount: plan,
           targetType,
           targetDate: isGoal ? targetDate : null,
@@ -484,7 +484,7 @@ function ItemForm({ currency, initial, cards = [], groups = [], bills = [], subm
         })
         if (ok && clearAfterSubmit) {
           setName('')
-          setGroup('')
+          setGroupId(null)
           setPlanText('')
           setTargetType('monthly')
           setTargetDate('')
@@ -499,33 +499,34 @@ function ItemForm({ currency, initial, cards = [], groups = [], bills = [], subm
         <input placeholder="e.g. Groceries" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
       </label>
 
-      <label className="field">
-        <span>Category (for Analytics)</span>
-        <input
-          placeholder="e.g. Utilities, Food, Housing"
-          value={group}
-          maxLength={40}
-          list={`groups-${initial?.id ?? 'new'}`}
-          onChange={(e) => setGroup(e.target.value)}
-        />
-        <datalist id={`groups-${initial?.id ?? 'new'}`}>
-          {groups.map((g) => (
-            <option key={g} value={g} />
-          ))}
-        </datalist>
-      </label>
-      {groups.length > 0 && (
-        <div className="group-chips" aria-label="Categories you've used">
-          {groups.map((g) => (
-            <button
-              key={g}
-              type="button"
-              className={`chip ${group.trim().toLowerCase() === g.toLowerCase() ? 'on' : ''}`}
-              onClick={() => setGroup(group.trim().toLowerCase() === g.toLowerCase() ? '' : g)}
-            >
-              {g}
-            </button>
-          ))}
+      {groups && (
+        <div className="field">
+          <span className="group-label">
+            <span>Category (for Analytics)</span>
+            <Link to="/setup/categories" className="group-edit-link">
+              Edit list
+            </Link>
+          </span>
+          {groups.length === 0 ? (
+            <p className="hint">
+              No categories yet. <Link to="/setup/categories">Set up your list</Link>.
+            </p>
+          ) : (
+            <div className="group-chips" role="radiogroup" aria-label="Category">
+              {groups.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={groupId === g.id}
+                  className={`chip ${groupId === g.id ? 'on' : ''}`}
+                  onClick={() => setGroupId(groupId === g.id ? null : g.id)}
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

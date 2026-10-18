@@ -14,6 +14,7 @@ import AnalyticsScreen from './components/AnalyticsScreen.jsx'
 import OwedScreen from './components/OwedScreen.jsx'
 import GuideScreen from './components/GuideScreen.jsx'
 import BillsScreen from './components/BillsScreen.jsx'
+import CategoriesScreen from './components/CategoriesScreen.jsx'
 
 // App decides WHICH screen to show: setup problem, loading, sign-in, or the app itself.
 export default function App() {
@@ -63,6 +64,7 @@ export default function App() {
       {/* :accountId is a placeholder — /setup/accounts/abc123 shows account abc123's budget items */}
       <Route path="/setup/accounts/:accountId" element={<AccountItemsScreen />} />
       <Route path="/setup/income" element={<IncomeSourcesScreen />} />
+      <Route path="/setup/categories" element={<CategoriesScreen />} />
       <Route
         path="/setup/notes"
         element={

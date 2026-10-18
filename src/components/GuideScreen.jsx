@@ -313,7 +313,8 @@ export default function GuideScreen() {
             <li><strong>Funded</strong>: how much of your monthly plans got money this month (paycheck splits, Assign, Move), and what they still need. Each item counts up to its plan.</li>
             <li><strong>Unspent in envelopes</strong>: what your budget items hold at the end of the month, with Unassigned beside it. Card payment envelopes aren’t counted.</li>
             <li>▲/▼ under each figure compares with the month before.</li>
-            <li><strong>Spending by category</strong>: give each budget item a category in Setup → the account → the item (pick one you’ve used or type a new one). Items without one show as Other. The tick is the plan; amber went over. Tap a category for its last 6 months and its items.</li>
+            <li><strong>Spending by category</strong>: in the order of your list (Setup → Categories). The tick is the plan; amber went over. Tap a category for its last 6 months and its items.</li>
+            <li><strong>Categories</strong>: Setup → Categories holds your list (it starts with a suggested one). Add, rename (every item follows), move up or down, or delete (its items go back to Other). Give a budget item its category in Setup → the account → tap the item → tap a category; tap it again to clear. Items without one show as Other.</li>
             <li><strong>Over plan</strong> lists items that spent more than their plan, and how many are on or under. <strong>Top envelopes</strong> are the five that spent most.</li>
             <li><strong>Income vs spent</strong>: the last 6 months side by side; tap a month for its numbers.</li>
             <li>Lower down: income by source, Owed progress, and Wishlist progress.</li>

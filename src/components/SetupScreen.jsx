@@ -100,6 +100,13 @@ export default function SetupScreen() {
         </span>
         <span aria-hidden="true">›</span>
       </Link>
+      <Link to="/setup/categories" className="setup-link">
+        <span>
+          <strong>Categories</strong>
+          <span className="muted"> · your list for grouping budget items in Analytics</span>
+        </span>
+        <span aria-hidden="true">›</span>
+      </Link>
       <Link to="/setup/notes" className="setup-link">
         <span>
           <strong>Bill notes</strong>

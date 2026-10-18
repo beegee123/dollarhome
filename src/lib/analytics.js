@@ -24,6 +24,9 @@ export function buildContext(data) {
   const bankCurrency = Object.fromEntries(data.banks.map((b) => [b.id, b.currency]))
   const accounts = Object.fromEntries(data.accounts.map((a) => [a.id, { ...a, currency: bankCurrency[a.bank_id] }]))
   const paymentEnvelopes = new Set(data.accounts.map((a) => a.payment_category_id).filter(Boolean))
+  const groupName = Object.fromEntries((data.groups ?? []).map((g) => [g.id, g.name]))
+  // Your list's order (Setup → Categories); Other goes last.
+  const groupOrder = Object.fromEntries((data.groups ?? []).map((g, i) => [g.name, i]))
   const cats = {}
   data.categories.forEach((c) => {
     const a = accounts[c.account_id]
@@ -45,14 +48,14 @@ export function buildContext(data) {
       accountKind: a?.kind,
       envelope,
       unassignedCash: c.is_unassigned && a?.kind !== 'credit',
-      group: c.category_group?.trim() || 'Other',
+      group: groupName[c.group_id] ?? 'Other',
       balance,
       plan: round(plan),
     }
   })
   const sourceCurrency = Object.fromEntries(data.sources.map((s) => [s.id, accounts[s.account_id]?.currency]))
   const currencies = [...new Set(data.banks.filter((b) => !b.archived).map((b) => b.currency))]
-  return { cats, sourceCurrency, currencies }
+  return { cats, sourceCurrency, currencies, groupOrder }
 }
 
 // Every figure for one month in one currency.
@@ -121,7 +124,7 @@ export function monthFigures(data, ctx, currency, key) {
   const byGroup = Object.values(groups)
     .map((g) => ({ ...g, spent: round(g.spent), plan: round(g.plan), envelopes: g.envelopes.sort((a, b) => b.spent - a.spent) }))
     .filter((g) => g.spent > 0 || g.plan > 0)
-    .sort((a, b) => b.spent - a.spent || b.plan - a.plan)
+    .sort((a, b) => (ctx.groupOrder[a.name] ?? 999) - (ctx.groupOrder[b.name] ?? 999) || b.spent - a.spent)
 
   const withPlan = rows.filter((r) => r.plan > 0)
   const over = withPlan.filter((r) => r.spent > r.plan + 0.004).sort((a, b) => b.spent - b.plan - (a.spent - a.plan))

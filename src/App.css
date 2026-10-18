@@ -1199,7 +1199,11 @@ html, body { overflow-x: clip; } /* safety net; unlike "hidden", clip keeps stic
 .bar-focus { fill: var(--bg); }
 .plan-line { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .trend-month--on { fill: var(--ink); font-weight: 700; }
-.group-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.group-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .group-chips .chip { padding: 4px 10px; font-size: 13px; }
 .item-group { color: var(--ink); }
 .group-chips .chip { min-height: 32px; }
+.group-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.group-edit-link { font: 600 13px var(--sans); color: var(--accent); text-transform: none; letter-spacing: 0; text-decoration: none; }
+.group-edit { display: grid; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.empty--small .small-button { margin-top: 6px; }

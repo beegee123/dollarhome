@@ -136,21 +136,25 @@ export async function fetchAccountItems(accountId) {
       .eq('archived', false)
       .order('sort_order')
       .order('name'),
-    // Every item's category (021_categories.sql): this account's, and the list to pick from.
-    supabase.from('categories').select('id, category_group').not('category_group', 'is', null),
+    // Categories (022_category_list.sql): the list to pick from, and each of this account's items' pick.
+    Promise.all([
+      supabase.from('category_groups').select('id, name, sort_order').order('sort_order').order('name'),
+      supabase.from('categories').select('id, group_id').eq('account_id', accountId),
+    ]),
   ])
   if (items.error) throw items.error
   if (siblings.error) throw siblings.error
   if (cards.error) throw cards.error
-  // Before 021 runs there's no category column: carry on without categories.
-  const groupRows = groups.error ? [] : groups.data
-  const groupOf = Object.fromEntries(groupRows.map((g) => [g.id, g.category_group]))
+  // Before 022 runs there's no list: carry on without categories.
+  const [groupList, itemGroups] = groups
+  const hasGroups = !groupList.error && !itemGroups.error
+  const groupOf = hasGroups ? Object.fromEntries(itemGroups.data.map((i) => [i.id, i.group_id])) : {}
 
   const all = items.data.map((i) => ({
     ...i,
     planned_amount: Number(i.planned_amount),
     balance: Number(i.balance),
-    category_group: groupOf[i.id] ?? null,
+    group_id: groupOf[i.id] ?? null,
   }))
   return {
     account: {
@@ -159,7 +163,7 @@ export async function fetchAccountItems(accountId) {
       monthly_payment: account.monthly_payment == null ? null : Number(account.monthly_payment),
     },
     cards: cards.data.filter((c) => c.bank?.currency === account.bank.currency),
-    groups: [...new Set(groupRows.map((g) => g.category_group))].sort((a, b) => a.localeCompare(b)),
+    groups: hasGroups ? groupList.data : null, // null = categories not set up yet (022)
     unassigned: all.find((i) => i.is_unassigned)?.balance ?? 0,
     total: all.reduce((sum, i) => sum + i.balance, 0), // everything DollarHome holds here
     items: all.filter((i) => !i.is_unassigned),
@@ -168,11 +172,11 @@ export async function fetchAccountItems(accountId) {
 }
 
 // Returns the new item's id.
-export async function addItem({ accountId, name, plannedAmount, targetType = 'monthly', targetDate = null, sortOrder, categoryGroup = null }) {
+export async function addItem({ accountId, name, plannedAmount, targetType = 'monthly', targetDate = null, sortOrder, groupId = null }) {
   const { data, error } = await supabase.from('categories').insert({
     account_id: accountId,
     name: name.trim(),
-    ...(categoryGroup ? { category_group: categoryGroup } : {}),
+    ...(groupId ? { group_id: groupId } : {}),
     planned_amount: plannedAmount,
     target_type: targetType,
     target_date: targetType === 'by_date' ? targetDate : null,

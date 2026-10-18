@@ -16,14 +16,15 @@ async function allRows(build) {
 // Archived banks/accounts/items are included so old history still has names.
 export async function fetchAnalytics(since) {
   const catCols = 'id, account_id, name, planned_amount, target_type, target_date, is_unassigned, archived'
-  const [banks, accounts, categories, transactions, events, sources, wishes, balances, debts, interest] = await Promise.all([
+  const [banks, accounts, categories, groups, transactions, events, sources, wishes, balances, debts, interest] = await Promise.all([
     supabase.from('banks').select('id, name, currency, sort_order, archived').order('sort_order').order('name'),
     supabase.from('accounts').select('id, bank_id, name, kind, payment_category_id'),
-    // With each item's category (021_categories.sql); before that runs, without it.
+    // With each item's category (022_category_list.sql); before that runs, without it.
     supabase
       .from('categories')
-      .select(`${catCols}, category_group`)
+      .select(`${catCols}, group_id`)
       .then((r) => (r.error ? supabase.from('categories').select(catCols) : r)),
+    supabase.from('category_groups').select('id, name, sort_order').order('sort_order').order('name'),
     allRows(() =>
       supabase
         .from('transactions')
@@ -47,6 +48,7 @@ export async function fetchAnalytics(since) {
     banks: banks.data,
     accounts: accounts.data,
     categories: num(categories.data, 'planned_amount'),
+    groups: groups.error ? [] : groups.data,
     transactions: num(transactions, 'amount'),
     events: num(events, 'amount'),
     sources: sources.data,
