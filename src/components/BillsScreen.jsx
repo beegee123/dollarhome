@@ -108,12 +108,25 @@ export default function BillsScreen() {
   // bill charged to it (and the card's own payment bill, if there is one).
   const bankBills = sorted.filter((b) => b.kind !== 'card_payment' && !b.card_id)
   const cardIds = [...new Set(sorted.filter((b) => b.card_id).map((b) => b.card_id))]
+  // Bank bills by bank (so each total stays in one currency).
+  const bankGroups = {}
+  bankBills.forEach((b) => {
+    const env = envOf(b)
+    const key = env?.bankName ?? 'Other'
+    ;(bankGroups[key] ??= { key: `bank-${key}`, title: `From ${key}`, currency: env?.currency ?? 'USD', bills: [] }).bills.push(b)
+  })
+  // A group's total, and what's still to pay this month (not yet paid this month).
+  const totals = (list) => {
+    const total = list.reduce((n, b) => n + b.amount, 0)
+    const left = list.filter((b) => b.lastPaid?.slice(0, 7) !== thisMonth).reduce((n, b) => n + b.amount, 0)
+    return { total, left }
+  }
   const sections = [
-    ...(bankBills.length ? [{ key: 'bank', title: 'Paid from the bank', bills: bankBills }] : []),
+    ...Object.values(bankGroups).map((g) => ({ ...g, ...totals(g.bills) })),
     ...cardIds.map((id) => {
       const own = sorted.find((b) => b.kind === 'card_payment' && b.card_id === id)
       const charged = sorted.filter((b) => b.kind === 'spend' && b.card_id === id)
-      return { key: id, card: cards[id], own, charged, bills: [...(own ? [own] : []), ...charged] }
+      return { key: id, card: cards[id], own, charged, bills: [...(own ? [own] : []), ...charged], currency: cards[id]?.currency ?? 'USD', ...totals(charged) }
     }),
   ]
 
@@ -254,6 +267,7 @@ export default function BillsScreen() {
                     </span>
                   )}
                 </span>
+                <GroupTotal sec={sec} />
                 {sec.charged.length > 0 && sec.card && (
                   <button type="button" className="small-button" onClick={() => pickCardBills(sec)}>
                     Pay {sec.charged.length === 1 ? 'this bill' : `these ${sec.charged.length}`}
@@ -261,7 +275,12 @@ export default function BillsScreen() {
                 )}
               </div>
             )}
-            {sec.title && <h2 className="section-title bill-section-title">{sec.title}</h2>}
+            {sec.title && (
+              <h2 className="section-title section-title--split bill-section-title">
+                <span>{sec.title}</span>
+                <GroupTotal sec={sec} />
+              </h2>
+            )}
         {sec.bills.map((b) => {
           if (editingId === b.id) {
             return (
@@ -672,6 +691,7 @@ function BillsSetup({ banks, cards, bills, busy, error, onSave, onCancel }) {
 function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
   const [kind, setKind] = useState(initial?.kind ?? 'spend')
   const [name, setName] = useState(initial?.name ?? '')
+  const nameTyped = useRef(!!initial) // editing an existing bill: never overwrite its name
   const [amountText, setAmountText] = useState(initial ? String(initial.amount) : '')
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '')
   const [cardId, setCardId] = useState(initial?.card_id ?? '')
@@ -725,22 +745,6 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
           </label>
         </fieldset>
       )}
-      <div className="spend-row">
-        <label className="field">
-          <span>Name</span>
-          <input
-            placeholder={isCardPay ? 'e.g. Visa statement' : 'e.g. Bell phone'}
-            value={name}
-            maxLength={60}
-            autoFocus
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label className="field field--plan">
-          <span>{isCardPay ? 'Amount' : 'Usual amount'}</span>
-          <input inputMode="decimal" placeholder="0" value={amountText} onChange={(e) => setAmountText(e.target.value)} />
-        </label>
-      </div>
       {isCardPay ? (
         <label className="field">
           <span>Card it pays</span>
@@ -748,7 +752,7 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
             value={cardId}
             onChange={(e) => {
               setCardId(e.target.value)
-              if (!name.trim() && cards[e.target.value]) setName(`${cards[e.target.value].name} payment`)
+              if (!nameTyped.current && cards[e.target.value]) setName(`${cards[e.target.value].name} payment`)
             }}
             className="field-select"
           >
@@ -765,7 +769,16 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
         <>
           <label className="field">
             <span>Comes from (budget item)</span>
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="field-select">
+            <select
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value)
+                // A bill is usually named after its budget item: fill it in unless you typed one.
+                const item = banks.flatMap((b) => b.accounts.flatMap((a) => a.items)).find((i) => i.id === e.target.value)
+                if (!nameTyped.current && item) setName(item.name)
+              }}
+              className="field-select"
+            >
               <option value="">Choose…</option>
               {banks.map((b) =>
                 b.accounts
@@ -798,6 +811,24 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
           </label>
         </>
       )}
+      <div className="spend-row">
+        <label className="field">
+          <span>Name</span>
+          <input
+            placeholder={isCardPay ? 'e.g. Visa statement' : 'e.g. Bell phone'}
+            value={name}
+            maxLength={60}
+            onChange={(e) => {
+              nameTyped.current = e.target.value.trim() !== ''
+              setName(e.target.value)
+            }}
+          />
+        </label>
+        <label className="field field--plan">
+          <span>{isCardPay ? 'Amount' : 'Usual amount'}</span>
+          <input inputMode="decimal" placeholder="0" value={amountText} onChange={(e) => setAmountText(e.target.value)} />
+        </label>
+      </div>
       <label className="field field--date">
         <span>Next due (optional)</span>
         <input type="date" value={nextDue} onChange={(e) => setNextDue(e.target.value)} />
@@ -817,6 +848,18 @@ function BillForm({ banks, cards, initial, busy, onSave, onCancel, onDelete }) {
         )}
       </div>
     </form>
+  )
+}
+
+// "C$1,425 · C$300 left": a group's bills, and what's not yet paid this month.
+function GroupTotal({ sec }) {
+  if (!sec.total) return null
+  return (
+    <span className="bill-group-total">
+      <span className="money">{formatMoney(sec.total, sec.currency)}</span>
+      {sec.left > 0 && sec.left < sec.total && <span className="muted"> · {formatMoney(sec.left, sec.currency)} left</span>}
+      {sec.left === 0 && <span className="match-ok"> · all paid</span>}
+    </span>
   )
 }
 

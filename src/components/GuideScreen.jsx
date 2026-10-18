@@ -92,7 +92,7 @@ export default function GuideScreen() {
             <dt>Unplanned money</dt>
             <dd>
               A gift, a sale, a refund you didn’t plan for: add an income source called “Other income” with an empty
-              split (one per account it can land in). + Income in → Other income → amount and a note → Apply. It lands in
+              split (one per account it can land in). + Income in → Other income → type the amount (the box starts empty) and a note → Apply. It lands in
               Unassigned; Assign it to the envelope you want (or Move it, if that envelope is in another account).
             </dd>
           </dl>
@@ -189,7 +189,8 @@ export default function GuideScreen() {
             <li>Two kinds of bill. A <strong>bill</strong> is a spend from a budget item (mortgage, phone, hydro), paid from the bank or with a card. A <strong>card payment</strong> pays a credit card from its payment envelope, the same as Pay card.</li>
             <li><strong>Paying a card’s bills in one go.</strong> Bills with Paid with set to a card show together under “On Visa” (with the card’s due date, if it has a card-payment bill). Tap <strong>Pay these</strong> on the card’s due date, check Enough/Short, then <strong>Log &amp; pay Visa</strong>: each bill comes out of its own budget item and the card is paid the total. “Log only” logs them without paying the card.</li>
             <li>Fastest setup: Bills → <strong>Set up bills</strong>. Every budget item is listed by account, like income splits; type the usual amount next to each one that’s a bill, pick Debit or a card and a next due date if you like, then Save. Clearing an amount removes that bill. Add card payments with + Add a bill → Card payment.</li>
-            <li>Or add one at a time: Budget → Bills (or Setup → Bills) → + Add a bill.</li>
+            <li>Or add one at a time: Budget → Bills (or Setup → Bills) → + Add a bill. Pick the budget item first and the Name fills in with it (type your own to keep it).</li>
+            <li>Bills are grouped by bank (From RBC, From Truist) and by card. Each group shows its total and what’s still to pay this month, or “all paid”.</li>
             <li>New amount or date (a hydro or card statement email)? Tap the bill’s <strong>amount</strong> on the Bills list, change the amount and next due date, Save.</li>
             <li>When bills go out, tick them. Tick one or several, change “This time” if needed, check the date, then tap Log. The panel shows whether each budget item (or card payment envelope) has enough. Undo takes the whole batch back.</li>
             <li>Bills are sorted by when they’re due. Logging a bill moves its due date to next month; one past its date shows <span className="match-off">Past due</span>. A bill logged this month shows <span className="match-ok">Paid</span>.</li>

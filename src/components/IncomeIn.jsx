@@ -54,8 +54,11 @@ export default function IncomeIn({ banks, onApply, onClose }) {
     setEdits({})
     setError(null)
     // A fixed split suggests its usual total; a percent split waits for you to type the payout.
+    // Pre-fill a fixed paycheck with its usual amount (or its split total). Nothing to pre-fill
+    // (e.g. "Other income" with an empty split) leaves the box empty, ready to type.
+    const usual = s.split_type === 'fixed' ? Number(s.expected_amount ?? s.lines.reduce((sum, l) => sum + l.value, 0)) : 0
     setAmountText(
-      s.split_type === 'fixed' ? String(s.expected_amount ?? s.lines.reduce((sum, l) => sum + l.value, 0)) : '',
+      usual > 0 ? String(usual) : '',
     )
   }
 
@@ -165,8 +168,9 @@ export default function IncomeIn({ banks, onApply, onClose }) {
                       autoComplete="off"
                       placeholder={currency === 'CAD' ? 'C$0.00' : '$0.00'}
                       value={amountText}
+                      onFocus={(e) => e.target.select()} // tap to replace a pre-filled amount
                       onChange={(e) => setAmountText(e.target.value)}
-                      autoFocus={source.split_type === 'percent'}
+                      autoFocus={source.split_type === 'percent' || !amountText}
                     />
                   </label>
                   <label className="field field--date">
